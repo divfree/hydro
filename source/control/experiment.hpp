@@ -111,8 +111,8 @@ class TModule : virtual public TExperiment_ref
   double dt;
   double tn;
   double tnp;
-  virtual void save_state(std::ofstream& fout) { cout<<"Warning: save_state() function is not defined for this module"<<endl;}
-  virtual void load_state(std::ifstream& fin) { cout<<"Warning: load_state() function is not defined for this module"<<endl;}
+  virtual void save_state(std::ofstream&) { cout<<"Warning: save_state() function is not defined for this module"<<endl;}
+  virtual void load_state(std::ifstream&) { cout<<"Warning: load_state() function is not defined for this module"<<endl;}
   void save_state(string filename);
   void load_state(string filename);
 
@@ -138,8 +138,8 @@ class Iterations : virtual private TExperiment_ref
   bool while_condition(int s, double R);
   virtual void iter_history_write_scalar(ofstream& fout)=0;
   virtual void iter_history_variables(ofstream& fout)=0;
-  virtual void iter_history_mesh_write(ofstream& fout) {;}
-  virtual void iter_history_mesh_header(ofstream& fout) {;}
+  virtual void iter_history_mesh_write(ofstream&) {;}
+  virtual void iter_history_mesh_header(ofstream&) {;}
   private:
   ofstream fihxy, fihs;
 };

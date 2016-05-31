@@ -201,7 +201,8 @@ class SessionPlain : public Session {
     WriteHeader();
   }
   void Write(double time = 0., std::string title = "") override {
-    out_ << "Time = " << time << std::endl;
+    out_ << "Time = " << time
+        << ", Title = " << title << std::endl;
     for (auto& entry_generic : content_) {
       entry_generic->Prepare();
       TryWriteField<geom::FieldCell<Scal>>(entry_generic.get());
@@ -264,7 +265,7 @@ class SessionTecplotAsciiGeneric : public SessionTecplotAscii {
       : SessionTecplotAscii(content, title, out)
       , mesh_(mesh)
   {}
-  void Write(double time = 0., std::string title = "") override {
+  void Write(double /*time = 0.*/, std::string /*title = ""*/) override {
     out_ << "tecplot with generic mesh: write" << std::endl;
   }
 };
@@ -555,7 +556,7 @@ class SessionTecplotAsciiScalar : public SessionTecplotAscii {
   {
     WriteZoneHeader(zonetitle);
   }
-  void Write(double time = 0., std::string title = "") override {
+  void Write(double /*time = 0.*/, std::string /*title = ""*/) override {
     for (auto& entry_generic : content_) {
       entry_generic->Prepare();
       if (auto entry = dynamic_cast<EntryScalar<Scal>*>(

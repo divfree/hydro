@@ -113,7 +113,7 @@ class MeshStructured : public MeshGeneric<Scal, 3> {
   IdxFace GetNeighbourFace(IdxCell idxcell, size_t n) const override {
     return fc_neighbour_face_[idxcell][n];
   }
-  Scal GetOutwardFactor(IdxCell idxcell, size_t n) const override {
+  Scal GetOutwardFactor(IdxCell, size_t n) const override {
     Scal factor;
     switch (n) {
       case 0:
@@ -286,13 +286,13 @@ MeshStructured<Scal>::MeshStructured(const BlockNodes& b_nodes,
     auto nface = [this, midx](IntIdx i, IntIdx j, IntIdx k, Direction dir) {
       return b_faces_.GetIdx(midx + MIdx(i, j, k), dir);
     };
-    fc_neighbour_face_[idxcell] = {
+    fc_neighbour_face_[idxcell] = {{
         nface(0, 0, 0, Direction::i),
         nface(1, 0, 0, Direction::i),
         nface(0, 0, 0, Direction::j),
         nface(0, 1, 0, Direction::j),
         nface(0, 0, 0, Direction::k),
-        nface(0, 0, 1, Direction::k)};
+        nface(0, 0, 1, Direction::k)}};
 
     fc_is_inner_[idxcell] = (mb < midx && midx + MIdx(1) < me);
   }
@@ -304,9 +304,9 @@ MeshStructured<Scal>::MeshStructured(const BlockNodes& b_nodes,
           b_cells_.GetIdx(MIdx(0, 0, 0)).GetRaw());
     };
 
-    cell_neighbour_cell_offset_ = {offset(-1, 0, 0), offset(1, 0, 0),
-                                   offset(0, -1, 0), offset(0, 1, 0),
-                                   offset(0, 0, -1), offset(0, 0, 1)};
+    cell_neighbour_cell_offset_ = {{offset(-1, 0, 0), offset(1, 0, 0),
+                                  offset(0, -1, 0), offset(0, 1, 0),
+                                  offset(0, 0, -1), offset(0, 0, 1)}};
   }
 
   // Offset for cell neighbour nodes
@@ -316,10 +316,10 @@ MeshStructured<Scal>::MeshStructured(const BlockNodes& b_nodes,
           b_nodes_.GetIdx(MIdx(0, 0, 0)).GetRaw());
     };
 
-    cell_neighbour_node_offset_ = {offset(0, 0, 0), offset(1, 0, 0),
-                                   offset(0, 1, 0), offset(1, 1, 0),
-                                   offset(0, 0, 1), offset(1, 0, 1),
-                                   offset(0, 1, 1), offset(1, 1, 1)};
+    cell_neighbour_node_offset_ = {{offset(0, 0, 0), offset(1, 0, 0),
+                                  offset(0, 1, 0), offset(1, 1, 0),
+                                  offset(0, 0, 1), offset(1, 0, 1),
+                                  offset(0, 1, 1), offset(1, 1, 1)}};
   }
 
   // Base for i-face and j-face neighbours
@@ -327,20 +327,23 @@ MeshStructured<Scal>::MeshStructured(const BlockNodes& b_nodes,
     for (auto midx : BlockCells(mb, me - mb + dir)) {
       IdxFace idxface = b_faces_.GetIdx(midx, dir);
       ff_direction_[idxface] = dir;
-      ff_neighbour_cell_[idxface] = {
+      ff_neighbour_cell_[idxface] = {{
           b_cells_.GetIdx(midx - dir),
-          b_cells_.GetIdx(midx)};
+          b_cells_.GetIdx(midx)}};
 
       auto l = [this, &midx](IntIdx i, IntIdx j, IntIdx k) {
         return b_nodes_.GetIdx(midx + MIdx(i, j, k));
       };
       if (dir == Direction::i) {
-        ff_neighbour_node_[idxface] = {l(0,0,0), l(0,1,0), l(0,1,1), l(0,0,1)};
+        ff_neighbour_node_[idxface] = {{
+            l(0,0,0), l(0,1,0), l(0,1,1), l(0,0,1)}};
       } else if (dir == Direction::j) {
-        ff_neighbour_node_[idxface] = {l(0,0,0), l(0,0,1), l(1,0,1), l(1,0,0)};
+        ff_neighbour_node_[idxface] = {{
+            l(0,0,0), l(0,0,1), l(1,0,1), l(1,0,0)}};
       } else {
         // dir == Direction::k
-        ff_neighbour_node_[idxface] = {l(0,0,0), l(1,0,0), l(1,1,0), l(0,1,0)};
+        ff_neighbour_node_[idxface] = {{
+            l(0,0,0), l(1,0,0), l(1,1,0), l(0,1,0)}};
       }
 
       if (midx[dir] == mb[dir]) {

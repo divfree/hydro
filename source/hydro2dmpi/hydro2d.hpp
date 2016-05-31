@@ -127,7 +127,7 @@ class hydro : public TModule
 template <class Mesh>
 std::shared_ptr<const solver::LinearSolverFactory>
 hydro<Mesh>::GetLinearSolverFactory(std::string linear_name,
-                                    std::string first_prefix) {
+                                    std::string /*first_prefix*/) {
   if (linear_name == "lu") {
     return std::make_shared<const solver::LinearSolverFactory>(
         std::make_shared<const solver::LuDecompositionFactory>());
@@ -993,7 +993,6 @@ void hydro<Mesh>::UpdateFluidProperties() {
     // Add anti-diffusion terms to velocity split fields
     for (auto idxface : mesh.Faces()) {
       if (mesh.IsInner(idxface)) {
-        Scal aver = 0.;
         for (auto i : phases) {
           v_ff_volume_flux_slip[i][idxface] +=
               solver::GetInterpolatedInner(
@@ -1116,9 +1115,10 @@ set int iter_history_sfixed 0*/
 
 
   if (P_bool["fluid_enable"]) {
+    size_t iter_history_sfixed = P_int["iter_history_sfixed"];
     while (!fluid_solver->IsConverged() ||
         (iter_history && P_int["iter_history_sfixed"] > 0 &&
-        fluid_solver->GetIterationCount() < P_int["iter_history_sfixed"])) {
+        fluid_solver->GetIterationCount() < iter_history_sfixed)) {
       fluid_solver->MakeIteration();
 
       ++P_int["s_sum"];

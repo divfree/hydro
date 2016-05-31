@@ -1,8 +1,9 @@
 #include "experiment.hpp"
 
 #include "../control/console.hpp"
-#include <omp.h>
-//#include "../hydro2dmpi/hydro2d.hpp"
+#ifdef _OPENMP
+  #include <omp.h>
+#endif
 #include "../revision.hpp"
 
 namespace hydro2D_uniform_MPI {
@@ -33,46 +34,42 @@ void TExperiment::status_change(ES new_status)
   #endif
 }
 
-string TExperiment::status_name(ES st)
-{
-  switch(status)
-  {
-  case ES::blank:
-    return "blank";
-  case ES::progress_init:
-    return "progress_init";
-  case ES::done_init:
-    return "done_init";
-  case ES::pending:
-    return "pending";
-  case ES::thread_created:
-    return "thread_created";
-  case ES::progress_step:
-    return "progress_step";
-  case ES::done_step:
-    return "done_step";
-  case ES::progress_write_results:
-    return "progress_write_results";
-  case ES::done_write_results:
-    return "done_write_results";
-  case ES::finished:
-    return "finished";
-  case ES::thread_destroyed:
-    return "thread_destroyed";
-  case ES::error:
-    return "error";
-  default:
-    return "Unknown_status";
+string TExperiment::status_name(ES status) {
+  switch(status) {
+    case ES::blank:
+      return "blank";
+    case ES::progress_init:
+      return "progress_init";
+    case ES::done_init:
+      return "done_init";
+    case ES::pending:
+      return "pending";
+    case ES::thread_created:
+      return "thread_created";
+    case ES::progress_step:
+      return "progress_step";
+    case ES::done_step:
+      return "done_step";
+    case ES::progress_write_results:
+      return "progress_write_results";
+    case ES::done_write_results:
+      return "done_write_results";
+    case ES::finished:
+      return "finished";
+    case ES::thread_destroyed:
+      return "thread_destroyed";
+    case ES::error:
+      return "error";
+    default:
+      return "Unknown_status";
   }
 }
 
-string TExperiment::status_name()
-{
+string TExperiment::status_name() {
   return status_name(status);
 }
 
-TExperiment::TExperiment(TConsole* _console) : console(_console)
-{
+TExperiment::TExperiment(TConsole* _console) : console(_console) {
   thread_ptr=0;
 
   TParameter<string>* Map1[Map_number]={&P_int, &P_double, &P_string, &P_bool, &P_vect};
@@ -91,12 +88,17 @@ TExperiment::TExperiment(TConsole* _console) : console(_console)
 
   status_change(ES::blank);
   P_string.set("status", status_name());
+
+#ifdef _OPENMP
   P_int.set("omp_num_threads", omp_get_max_threads());
+#else
+  P_int.set("omp_num_threads", 1);
+#endif
+
   set_name();
 }
 
-void TExperiment::init()
-{
+void TExperiment::init() {
   output_dir=ecast(P_string(_output_dir));
   if(output_dir!="" && !directory_exists(output_dir))
   {

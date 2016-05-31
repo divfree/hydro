@@ -722,7 +722,7 @@ class LinearSolverFactory {
   bool TryCreate(std::shared_ptr<LinearSolver<Scal, Idx, Expr>>& res) const {
     if (auto p_factory_ =
         dynamic_cast<const Factory*>(p_generic_factory_.get())) {
-      res = p_factory_->Create<Scal, Idx, Expr>();
+      res = p_factory_->template Create<Scal, Idx, Expr>();
       return true;
     }
     return false;

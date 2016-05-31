@@ -1,7 +1,5 @@
 #pragma once
 
-#include <time.h>
-#include <stdio.h>
 #include <cmath>
 #include <boost/filesystem.hpp>
 #include <boost/timer/timer.hpp>

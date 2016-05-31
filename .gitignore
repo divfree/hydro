@@ -207,3 +207,11 @@ local.properties
 # hydro3 revision
 hydro3/revision.cpp
 *.lock
+
+build.sh
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+Makefile
+cmake_install.cmake

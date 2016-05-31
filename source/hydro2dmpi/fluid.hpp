@@ -174,7 +174,7 @@ class ConvectionDiffusionImplicit : public ConvectionDiffusion<Mesh> {
     CopyToVector(Layers::time_curr);
     this->IncTime();
   }
-  double GetConvergenceIndicator() const {
+  double GetConvergenceIndicator() const override {
     if (this->GetIterationCount() == 0) {
       return 1.;
     }
@@ -559,7 +559,6 @@ class FluidSimple : public FluidSolver<Mesh> {
         outlet_area += mesh.GetArea(idxface);
       } else if (auto cond = dynamic_cast<Inlet<Mesh>*>(cond_generic)) {
         size_t id = cond->GetNeighbourCellId();
-        IdxCell idxcell = mesh.GetNeighbourCell(idxface, id);
         Scal factor = (id == 0 ? -1. : 1.);
 
         inlet_volume_flux +=
@@ -583,7 +582,6 @@ class FluidSimple : public FluidSolver<Mesh> {
 
       if (auto cond = dynamic_cast<Outlet<Mesh>*>(cond_generic)) {
         size_t id = cond->GetNeighbourCellId();
-        IdxCell idxcell = mesh.GetNeighbourCell(idxface, id);
         Scal factor = (id == 0 ? 1. : -1.);
 
         Vect normal = mesh.GetSurface(idxface) / mesh.GetArea(idxface);
@@ -1115,7 +1113,7 @@ class FluidSimple : public FluidSolver<Mesh> {
     conv_diff_solver_->FinishStep();
     this->IncTime();
   }
-  double GetConvergenceIndicator() const {
+  double GetConvergenceIndicator() const override {
     return conv_diff_solver_->GetConvergenceIndicator();
   }
   const geom::FieldCell<Vect>& GetVelocity() override {

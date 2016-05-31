@@ -41,19 +41,17 @@ class Vect {
   size_t size() const {
     return comp_.size();
   }
+  explicit Vect(Scal value) {
+    std::fill(comp_.begin(), comp_.end(), value);
+  }
   template <class... Args>
-  explicit Vect(Args... args)
-      : comp_{args...}
+  explicit Vect(Scal first, Args... args)
+      : comp_{{first, args...}}
   {
-    constexpr size_t num_args = sizeof...(Args);
+    constexpr size_t num_args = 1 + sizeof...(args);
     static_assert(
-        num_args == dim || num_args == 1,
-        "Vect braced initializer must contain exactly 'dim' or 1 arguments");
-    if (num_args == 1) {
-      for (size_t i = 0; i < dim; ++i) {
-        comp_[i] = comp_[0]; // Clone first to others
-      }
-    }
+        num_args == dim,
+        "Vect braced initializer must contain exactly 'dim' arguments");
   }
   template <class OtherScal>
   explicit Vect(const Vect<OtherScal, dim>& other) {

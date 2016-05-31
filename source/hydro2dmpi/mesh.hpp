@@ -810,7 +810,7 @@ class SearchMesh {
   IdxSeg GetIdxSeg(Vect vect) const {
     return block_.GetIdx(GetMIdx(vect));
   }
-  bool HaveCommonPoints(IdxCell idxcell, MIdx midx) const {
+  bool HaveCommonPoints(IdxCell, MIdx) const {
     return true;
   }
   void InitRefs(MIdx block_dimensions, size_t& num_intersect_seg_max,

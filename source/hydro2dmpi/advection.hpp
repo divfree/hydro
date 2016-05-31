@@ -354,7 +354,7 @@ class AdvectionSolverExplicit :
     fc_u_.time_curr = fc_u_.iter_curr;
     this->IncTime();
   }
-  double GetConvergenceIndicator() const {
+  double GetConvergenceIndicator() const override {
     if (this->GetIterationCount() == 0) {
       return 1.;
     }
@@ -493,7 +493,7 @@ class AdvectionSolverMultiExplicit :
     }
     this->IncTime();
   }
-  double GetConvergenceIndicator() const {
+  double GetConvergenceIndicator() const override {
     if (this->GetIterationCount() == 0) {
       return 1.;
     }
@@ -700,7 +700,7 @@ class AdvectionSolverMultiParticles :
   void FinishStep() override {
     this->IncTime();
   }
-  double GetConvergenceIndicator() const {
+  double GetConvergenceIndicator() const override {
     return 1.;
   }
   const geom::FieldCell<Scal>& GetField(size_t field_id) override {

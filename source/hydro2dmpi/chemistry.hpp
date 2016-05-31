@@ -43,7 +43,7 @@ class KineticsSteady : public Kinetics<Mesh> {
       , num_phases_(v_molar_mass_.size())
   {}
   std::vector<Scal> GetReactionRate(
-      IdxCell idxcell,
+      IdxCell,
       const std::vector<Scal>& v_molar_concentration) override {
     std::vector<Scal> res(num_phases_);
 
@@ -127,7 +127,7 @@ class KineticsNadirov : public Kinetics<Mesh> {
     }
   }
   std::vector<Scal> GetReactionRate(
-      IdxCell idxcell,
+      IdxCell,
       const std::vector<Scal>& v_molar_concentration) override {
     std::vector<Scal> res(num_phases_);
 

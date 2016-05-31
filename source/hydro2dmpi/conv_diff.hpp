@@ -239,7 +239,7 @@ class ConvectionDiffusionScalarImplicit :
     }
     this->IncTime();
   }
-  double GetConvergenceIndicator() const {
+  double GetConvergenceIndicator() const override {
     if (this->GetIterationCount() == 0) {
       return 1.;
     }

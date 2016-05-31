@@ -85,7 +85,7 @@ class HeatSolver : public UnsteadyIterativeSolver {
     this->IncTime();
     solver_->FinishStep();
   }
-  double GetConvergenceIndicator() const {
+  double GetConvergenceIndicator() const override {
     return solver_->GetConvergenceIndicator();
   }
   const geom::FieldCell<Scal>& GetTemperature() const {

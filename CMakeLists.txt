@@ -72,7 +72,10 @@ endif()
 include_directories(
   ${TECPLOT_DIR}/include
 )
-find_library(TECIO_LIBRARY tecio ${TECPLOT_DIR}/lib ${TECPLOT_DIR}/bin)
+find_library(TECIO_LIBRARY 
+             NAMES tecio 
+             PATHS ${TECPLOT_DIR}/lib
+             NO_DEFAULT_PATH)
 
 set(LIBRARIES
   pthread
@@ -81,4 +84,4 @@ set(LIBRARIES
   ${TECIO_LIBRARY}
 )
 
-target_link_libraries(${BINARY_NAME} ${LIBRARIES})
+target_link_libraries(${BINARY_NAME} ${LIBRARIES}) 

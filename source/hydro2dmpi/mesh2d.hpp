@@ -111,7 +111,7 @@ class MeshStructured : public MeshGeneric<Scal, 2> {
   IdxFace GetNeighbourFace(IdxCell idxcell, size_t n) const override {
     return fc_neighbour_face_[idxcell][n];
   }
-  Scal GetOutwardFactor(IdxCell idxcell, size_t n) const override {
+  Scal GetOutwardFactor(IdxCell, size_t n) const override {
     Scal factor;
     switch (n) {
       case 0:
@@ -270,11 +270,11 @@ MeshStructured<Scal>::MeshStructured(const BlockNodes& b_nodes,
     auto nface = [this, midx](IntIdx i, IntIdx j, Direction dir) {
       return b_faces_.GetIdx(midx + MIdx(i, j), dir);
     };
-    fc_neighbour_face_[idxcell] = {
+    fc_neighbour_face_[idxcell] = {{
         nface(0, 0, Direction::i),
         nface(1, 0, Direction::i),
         nface(0, 0, Direction::j),
-        nface(0, 1, Direction::j)};
+        nface(0, 1, Direction::j)}};
 
     fc_is_inner_[idxcell] = (mb < midx && midx + MIdx(1) < me);
   }
@@ -286,8 +286,8 @@ MeshStructured<Scal>::MeshStructured(const BlockNodes& b_nodes,
           b_cells_.GetIdx(MIdx(0, 0)).GetRaw());
     };
 
-    cell_neighbour_cell_offset_ = {offset(-1, 0), offset(1, 0),
-                                   offset(0, -1), offset(0, 1)};
+    cell_neighbour_cell_offset_ = {{offset(-1, 0), offset(1, 0),
+                                  offset(0, -1), offset(0, 1)}};
   }
 
   // Offset for cell neighbour nodes
@@ -297,8 +297,8 @@ MeshStructured<Scal>::MeshStructured(const BlockNodes& b_nodes,
           b_nodes_.GetIdx(MIdx(0, 0)).GetRaw());
     };
 
-    cell_neighbour_node_offset_ = {offset(0, 0), offset(1, 0),
-                                   offset(1, 1), offset(0, 1)};
+    cell_neighbour_node_offset_ = {{offset(0, 0), offset(1, 0),
+                                  offset(1, 1), offset(0, 1)}};
   }
 
   // Base for i-face and j-face neighbours
@@ -306,18 +306,18 @@ MeshStructured<Scal>::MeshStructured(const BlockNodes& b_nodes,
     for (auto midx : BlockCells(mb, me - mb + dir)) {
       IdxFace idxface = b_faces_.GetIdx(midx, dir);
       ff_direction_[idxface] = dir;
-      ff_neighbour_cell_[idxface] = {
+      ff_neighbour_cell_[idxface] = {{
           b_cells_.GetIdx(midx - dir),
-          b_cells_.GetIdx(midx)};
+          b_cells_.GetIdx(midx)}};
       if (dir == Direction::i) {
-        ff_neighbour_node_[idxface] = {
+        ff_neighbour_node_[idxface] = {{
             b_nodes_.GetIdx(midx),
-            b_nodes_.GetIdx(midx + Direction::j)};
+            b_nodes_.GetIdx(midx + Direction::j)}};
       } else {
         // dir == Direction::j
-        ff_neighbour_node_[idxface] = {
+        ff_neighbour_node_[idxface] = {{
             b_nodes_.GetIdx(midx + Direction::i),
-            b_nodes_.GetIdx(midx)};
+            b_nodes_.GetIdx(midx)}};
       }
       if (midx[dir] == mb[dir]) {
         ff_neighbour_cell_[idxface][0] = IdxCell::None();

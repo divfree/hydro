@@ -442,8 +442,7 @@ geom::FieldFace<T> Interpolate(const geom::FieldCell<T>& fc_u,
       Vect xf = mesh.GetCenter(idxface);
       Scal alpha = xc.dist(xf) * factor;
       res[idxface] = fc_u[cc] + cond_derivative->GetDerivative() * alpha;
-    } else if (auto cond_derivative =
-        dynamic_cast<ConditionFaceExtrapolation*>(cond)) {
+    } else if (dynamic_cast<ConditionFaceExtrapolation*>(cond)) {
       size_t id = mesh.GetValidNeighbourCellId(idxface);
       IdxCell idxcell = mesh.GetNeighbourCell(idxface, id);
       Scal factor = (id == 0 ? 1. : -1.);

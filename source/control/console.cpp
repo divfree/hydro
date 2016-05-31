@@ -10,8 +10,7 @@ void sleep_ms(int ms) {
   boost::this_thread::sleep(boost::posix_time::milliseconds(ms));
 }
 
-void TConsole::cmd_exit(string arg)
-{
+void TConsole::cmd_exit(string) {
   scheduler_term();
   int expn=undone_exp_count();
   if(expn>0)
@@ -26,16 +25,14 @@ void TConsole::cmd_exit(string arg)
   flag_exit=true;
 }
 
-void TConsole::cmd_echo(string arg)
-{
+void TConsole::cmd_echo(string arg) {
   int i=0;
   int n=arg.length();
   while(i<n && arg[i]==' ') i++;
   cout<<arg.substr(i)<<endl;
 }
 
-void TConsole::cmd_add_experiment(string arg)
-{
+void TConsole::cmd_add_experiment(string arg) {
   stringstream buf;
   buf.str(arg);
   string exp_name;
@@ -53,8 +50,7 @@ void TConsole::cmd_add_experiment(string arg)
   }
 }
 
-void TConsole::exp_del(TExperiment* ex)
-{
+void TConsole::exp_del(TExperiment* ex) {
   cflog<<"("<<ex->name<<", "<<ex->P_string["name"]<<" ) deleted"<<endl;
   if(!ex->st_term)
   {
@@ -64,8 +60,7 @@ void TConsole::exp_del(TExperiment* ex)
   delete ex;
 }
 
-void TConsole::cmd_del_experiment(string arg)
-{
+void TConsole::cmd_del_experiment(string arg) {
   stringstream buf;
   buf.str(arg);
   string exp_name;
@@ -84,8 +79,7 @@ void TConsole::cmd_del_experiment(string arg)
   }
 }
 
-void TConsole::cmd_current_experiment(string arg)
-{
+void TConsole::cmd_current_experiment(string arg) {
   stringstream buf;
   buf.str(arg);
   string exp_name;
@@ -96,14 +90,12 @@ void TConsole::cmd_current_experiment(string arg)
       else cur_exp_name=exp_name;
 }
 
-void TConsole::cmd_init(string arg)
-{
+void TConsole::cmd_init(string) {
   TExperiment &cur_exp=*check_cur_exp();
   cur_exp.init();
 }
 
-void TConsole::cmd_status(string arg)
-{
+void TConsole::cmd_status(string) {
   if(cur_exp_name!="")
   {
     TExperiment &cur_exp=*check_cur_exp();
@@ -118,16 +110,14 @@ void TConsole::cmd_status(string arg)
   cout<<"Threads: "<<sysinfo::threads()<<endl;
 }
 
-void TConsole::cmd_wait_for_experiments_completion(string arg)
-{
+void TConsole::cmd_wait_for_experiments_completion(string) {
   while(undone_exp_count()>0 || pvar->running)
   {
     sleep(1);
   }
 }
 
-void TConsole::cmd_run(string arg)
-{
+void TConsole::cmd_run(string arg) {
   stringstream buf;
   buf.str(arg);
   string filename="";
@@ -152,8 +142,7 @@ void TConsole::cmd_run(string arg)
   fin.close();
 }
 
-void TConsole::exp_start(TExperiment* experiment)
-{
+void TConsole::exp_start(TExperiment* experiment) {
   TExperiment &cur_exp=*experiment;
   if(cur_exp.st_thread)
   {
@@ -170,8 +159,7 @@ void TConsole::exp_start(TExperiment* experiment)
   }
 }
 
-void TConsole::exp_create_thread(TExperiment* experiment)
-{
+void TConsole::exp_create_thread(TExperiment* experiment) {
   TExperiment &cur_exp=*experiment;
   if(cur_exp.st_pending)
   {
@@ -188,13 +176,11 @@ void TConsole::exp_create_thread(TExperiment* experiment)
     throw string("Experiment '"+cur_exp_name+"' is not pending");
   }
 }
-void TConsole::cmd_start(string arg)
-{
+void TConsole::cmd_start(string) {
   exp_start(check_cur_exp());
 }
 
-void TConsole::cmd_start_in_main_thread(string arg)
-{
+void TConsole::cmd_start_in_main_thread(string) {
   TExperiment &cur_exp=*check_cur_exp();
   if(ecast(cur_exp.P_bool("started")))
   {
@@ -211,8 +197,7 @@ void TConsole::cmd_start_in_main_thread(string arg)
   }
 }
 
-void TConsole::exp_stop(TExperiment* ex)
-{
+void TConsole::exp_stop(TExperiment* ex) {
   if(ex->st_thread)
   {
     ex->P_bool["terminate"]=true;
@@ -228,13 +213,11 @@ void TConsole::exp_stop(TExperiment* ex)
   }
 }
 
-void TConsole::cmd_stop(string arg)
-{
+void TConsole::cmd_stop(string) {
   exp_stop(check_cur_exp());
 }
 
-void TConsole::exp_term(TExperiment* ex)
-{
+void TConsole::exp_term(TExperiment* ex) {
   if(ex->st_init)
   {
     exp_stop(ex);
@@ -246,13 +229,11 @@ void TConsole::exp_term(TExperiment* ex)
   }
 }
 
-void TConsole::cmd_term(string arg)
-{
+void TConsole::cmd_term(string) {
   exp_term(check_cur_exp());
 }
 
-void TConsole::cmd_list_exp(string arg)
-{
+void TConsole::cmd_list_exp(string) {
   cout<<"Experiments: "<<Experiments.length<<endl;
   for(int i=0; i<Experiments.length; i++) cout<<Experiments.get_key(i)<<" ";
   cout<<endl;
@@ -283,8 +264,7 @@ void TConsole::cmd_list_exp(string arg)
   cout<<endl;
 }
 
-TExperiment* TConsole::check_cur_exp()
-{
+TExperiment* TConsole::check_cur_exp() {
   if(!Experiments.exist(cur_exp_name))
   {
     throw string("Experiment '"+cur_exp_name+"' doesn't exist");
@@ -293,8 +273,7 @@ TExperiment* TConsole::check_cur_exp()
 }
 
 // TODO: Parameters parsed on evaluation
-void TConsole::cmd_set(string arg)
-{
+void TConsole::cmd_set(string arg) {
   stringstream buf;
   buf.str(arg);
   string p_type;
@@ -334,8 +313,7 @@ void TConsole::cmd_set(string arg)
   if(!found) throw string("Unknown type '"+p_type+"'");
 }
 
-void TConsole::cmd_del(string arg)
-{
+void TConsole::cmd_del(string arg) {
   stringstream buf;
   buf.str(arg);
   string name;
@@ -363,8 +341,7 @@ void TConsole::cmd_del(string arg)
   if(!found) cout<<"Parameter '"+name+"' not found";
 }
 
-void TConsole::cmd_list_parameters(string arg)
-{
+void TConsole::cmd_list_parameters(string arg) {
   stringstream buf;
   buf.str(arg);
   string type;
@@ -484,8 +461,7 @@ void TConsole::cmd_list_parameters(string arg)
   }
 }
 
-string TConsole::get_parameter_value(string arg, TExperiment* ex)
-{
+string TConsole::get_parameter_value(string arg, TExperiment* ex) {
   stringstream buf;
   buf.str(arg);
   string name;
@@ -536,24 +512,20 @@ string TConsole::get_parameter_value(string arg, TExperiment* ex)
   if(found) return res; else throw string("Parameter '"+name+"' not found");
 }
 
-void TConsole::cmd_value(string arg)
-{
+void TConsole::cmd_value(string arg) {
   cout<<get_parameter_value(arg);
 }
 
 
-void TConsole::cmd_pvar_new(string arg)
-{
+void TConsole::cmd_pvar_new(string arg) {
   pvar->new_variator(arg);
 }
 
-void TConsole::cmd_pvar_start(string arg)
-{
+void TConsole::cmd_pvar_start(string) {
   pvar->start();
 }
 
-void TConsole::cmd_pvar_set(string arg)
-{
+void TConsole::cmd_pvar_set(string) {
   for(int i=0; i<pvar->VL.N; i++)
   {
     PVar_single& V=pvar->VL[i];
@@ -561,13 +533,11 @@ void TConsole::cmd_pvar_set(string arg)
   }
 }
 
-void TConsole::cmd_pvar_table(string arg)
-{
+void TConsole::cmd_pvar_table(string arg) {
   pvar->table_open(arg);
 }
 
-void TConsole::cmd_open_log(string arg)
-{
+void TConsole::cmd_open_log(string arg) {
   stringstream buf;
   buf.str(arg);
   string filename;
@@ -576,57 +546,14 @@ void TConsole::cmd_open_log(string arg)
   cflog<<"Console log"<<endl;
 }
 
-void TConsole::cmd_test(string arg)
-{
+void TConsole::cmd_test(string) {
 }
 
-void TConsole::cmd_test2(string arg)
-{
+void TConsole::cmd_test2(string) {
 
 }
 
-void TConsole::cmd_copy_U_comp_to_grid_double(string arg)
-{
-  /*TExperiment& ex=*check_cur_exp();
-  stringstream buf;
-  buf.str(arg);
-
-  string comp_name;
-  buf>>comp_name;
-
-  int k;
-  if(comp_name=="u")
-  {
-    k=U_comp_u;
-  }
-  else if(comp_name=="v")
-  {
-    k=U_comp_v;
-  }
-  else if(comp_name=="p")
-  {
-    k=U_comp_p;
-  } else
-  {
-    throw string("Unknown component name: '"+comp_name+"'");
-}
-
-  string grid_name;
-  buf>>grid_name;
-
-  grid_double* u=ex.P_grid_double(grid_name);
-  if(!u)
-  {
-    u=ex.P_grid_double.set(grid_name, grid_double());
-  }
-
-  grid_svectexp_to_grid_double(*u, ex.U, k);
-
-  cout<<"Component U["+comp_name+"] successfully copied to grid_double '"+grid_name+"'"<<endl;*/
-}
-
-void TConsole::cmd_cd(string arg)
-{
+void TConsole::cmd_cd(string arg) {
   stringstream buf;
   buf.str(arg);
   string dir=get_string_with_ws(buf);
@@ -639,8 +566,7 @@ void TConsole::cmd_cd(string arg)
   }
 }
 
-void TConsole::cmd_dir(string arg)
-{
+void TConsole::cmd_dir(string arg) {
   using namespace boost::filesystem;
   stringstream buf;
   buf.str(arg);
@@ -658,8 +584,7 @@ void TConsole::cmd_dir(string arg)
   }
 }
 
-void TConsole::cmd_sleep(string arg)
-{
+void TConsole::cmd_sleep(string arg) {
   stringstream buf;
   buf.str(arg);
   int n;
@@ -667,8 +592,7 @@ void TConsole::cmd_sleep(string arg)
   sleep(n);
 }
 
-void TConsole::cmd_usleep(string arg)
-{
+void TConsole::cmd_usleep(string arg) {
   stringstream buf;
   buf.str(arg);
   int n;
@@ -676,69 +600,15 @@ void TConsole::cmd_usleep(string arg)
   sleep_ms(n);
 }
 
-void TConsole::cmd_nop(string arg)
-{
+void TConsole::cmd_nop(string) {
 
 }
 
-void TConsole::cmd_hello(string arg)
-{
+void TConsole::cmd_hello(string) {
   cout<<"Hi! Nice to see you."<<endl;
 }
 
-void TConsole::cmd_save_grid_double(string arg)
-{
-  /*stringstream buf;
-  buf.str(arg);
-
-  string gridname="";
-  buf>>gridname;
-
-  TExperiment& ex=*check_cur_exp();
-  grid_double* u=ex.P_grid_double(gridname);
-  if(!u)
-  {
-    throw string("grid_double '"+gridname+"' not found");
-  }
-
-  string filename="";
-  filename=get_string_with_ws(buf);
-  ofstream fsave;
-  c_open_file(fsave, filename);
-  fsave.precision(16);
-
-  save_grid(*u, fsave);
-
-  cout<<"grid_double '"+gridname+"' successfully saved to '"+filename+"'"<<endl;*/
-}
-
-void TConsole::cmd_load_grid_double(string arg)
-{
-  /*stringstream buf;
-  buf.str(arg);
-
-  string gridname="";
-  buf>>gridname;
-
-  TExperiment& ex=*check_cur_exp();
-  grid_double* u=ex.P_grid_double(gridname);
-  if(!u)
-  {
-    u=ex.P_grid_double.set(gridname, grid_double());
-  }
-
-  string filename="";
-  filename=get_string_with_ws(buf);
-  ifstream fload;
-  c_open_file(fload, filename);
-
-  load_grid(*u, fload);
-
-  cout<<"grid_double '"+gridname+"' successfully loaded from '"+filename+"'"<<endl;*/
-}
-
-void TConsole::cmd_save(string arg)
-{
+void TConsole::cmd_save(string arg) {
   TExperiment* ex=check_cur_exp();
   stringstream buf;
   buf.str(arg);
@@ -750,8 +620,7 @@ void TConsole::cmd_save(string arg)
   cout<<"Context of '"<<cur_exp_name<<"' successfully saved"<<endl;
 }
 
-void TConsole::cmd_load(string arg)
-{
+void TConsole::cmd_load(string arg) {
   TExperiment* ex=check_cur_exp();
 
   stringstream buf;
@@ -764,8 +633,7 @@ void TConsole::cmd_load(string arg)
   cout<<"Context of '"<<cur_exp_name<<"' successfully loaded"<<endl;
 }
 
-void TConsole::cmd_help(string arg)
-{
+void TConsole::cmd_help(string) {
   cout<<"Commands list:"<<endl;
   for(int i=0; i<Commands.length; i++)
   {
@@ -777,54 +645,7 @@ void TConsole::cmd_help(string arg)
   }
 }
 
-void TConsole::cmd_draw_mu_mix(string arg)
-{
-  /*stringstream buf;
-  buf.str(arg);
-  int max_index=0;
-  buf>>max_index;
-
-  TExperiment& ex=*check_cur_exp();
-
-  ofstream fout;
-  c_open_file(fout, ex.P_string[_exp_name]+"_mu_mix.plt");
-
-  fout<<"VARIABLES=\"beta\" \"mu_mix\""<<endl;
-  fout<<"ZONE DATAPACKING=POINT"<<endl;
-  fout<<"T=\""<<ex.P_string[_exp_name]<<"\""<<endl;
-  if(max_index==0) max_index=100;
-
-  for(int i=0; i<=max_index; i++)
-  {
-    double beta=double(i)/max_index;
-    fout<<beta<<" "<<ex.mu_mix(1-beta)<<endl;
-  }
-  fout<<endl;
-  fout.close();*/
-}
-
-
-void TConsole::cmd_write_parabolic_profile_plt(string arg)
-{
-  /*stringstream buf;
-  buf.str(arg);
-  int max_index=0;
-  buf>>max_index;
-
-  TExperiment& ex=*check_cur_exp();
-
-  if(ex.P_string[_problem]!="square" && ex.P_string[_problem]!="square_flow")
-  {
-    throw string("'string problem' must be set to 'square'");
-  }
-
-  ex.calc_parabolic_profile();
-
-  ex.write_results(true);*/
-}
-
-void TConsole::cmd_mkdir(string arg)
-{
+void TConsole::cmd_mkdir(string arg) {
   stringstream buf;
   buf.str(arg);
   string dir=get_string_with_ws(buf);
@@ -832,8 +653,7 @@ void TConsole::cmd_mkdir(string arg)
 }
 
 
-TConsole::TConsole()
-{
+TConsole::TConsole() {
   finished=false;
 
   TParameter<string>* CMap1[CMap_number]={&CP_bool, &CP_double, &CP_int, &CP_string};
@@ -876,18 +696,11 @@ TConsole::TConsole()
   Commands.set("dir",&TConsole::cmd_dir);
   Commands.set("save",&TConsole::cmd_save);
   Commands.set("load",&TConsole::cmd_load);
-  Commands.set("save_grid_double",&TConsole::cmd_save_grid_double);
-  Commands.set("load_grid_double",&TConsole::cmd_load_grid_double);
   Commands.set("term",&TConsole::cmd_term);
   Commands.set("test",&TConsole::cmd_test);
-  //Commands.set("test2",&TConsole::cmd_test2);
-  //Commands.set("more_time",&TConsole::cmd_more_time);
-  //Commands.set("draw_mu_mix",&TConsole::cmd_draw_mu_mix);
   Commands.set("hello",&TConsole::cmd_hello);
   Commands.set("mkdir",&TConsole::cmd_mkdir);
   Commands.set("wait_for_completion",&TConsole::cmd_wait_for_experiments_completion);
-  //Commands.set("copy_U_comp_to_grid_double",&TConsole::cmd_copy_U_comp_to_grid_double);
-  Commands.set("copy_comp",&TConsole::cmd_copy_U_comp_to_grid_double);
   Commands.set("pvar_new",&TConsole::cmd_pvar_new);
   Commands.set("pvar_start",&TConsole::cmd_pvar_start);
   Commands.set("pvar_set",&TConsole::cmd_pvar_set);
@@ -916,15 +729,13 @@ TConsole::TConsole()
   Commands_desc.set("wait_for_completion","wait for all experiments termination");
   Commands_desc.set("value","provides the value of parameter");
   Commands_desc.set("pvar_table","<filename> <p1> <p2> ...");
-  Commands_desc.set("write_parabolic_profile","calc_parabolic_profile() and write_results() (run 'init' firstly)");
 
   pvar=new PVar(this);
 
   scheduler_init();
 }
 
-TConsole::~TConsole()
-{
+TConsole::~TConsole() {
   if(!finished)
   {
     cmd_exit("");
@@ -934,8 +745,7 @@ TConsole::~TConsole()
   delete pvar;
 }
 
-void extract_cmd_name_and_arg(string str, string& name, string& arg)
-{
+void extract_cmd_name_and_arg(string str, string& name, string& arg) {
   stringstream buf;
   buf.str(str);
   buf>>name;
@@ -949,31 +759,26 @@ void extract_cmd_name_and_arg(string str, string& name, string& arg)
   }
 }
 
-void TConsole::error(string msg)
-{
+void TConsole::error(string msg) {
   cout<<"ERROR: "<<msg<<endl;
   cflog<<"ERROR: "<<msg<<endl;
 }
 
-void TConsole::write_msg(string msg)
-{
+void TConsole::write_msg(string msg) {
   cout<<msg;
 }
 
-void TConsole::msg_eol(string msg)
-{
+void TConsole::msg_eol(string msg) {
   cout<<msg<<endl;
 }
 
-string TConsole::prompt()
-{
+string TConsole::prompt() {
   //string str=get_time("%X");
   string str=cur_exp_name;
   return get_current_directory()+":"+str+"> ";
 }
 
-void TConsole::execute()
-{
+void TConsole::execute() {
   while(!flag_exit)
   {
     try
@@ -1000,8 +805,7 @@ void TConsole::execute()
   finished=true;
 }
 
-void TConsole::check_directory(string dirname)
-{
+void TConsole::check_directory(string dirname) {
   if(!directory_exists(dirname))
   {
     char c=0;
@@ -1029,24 +833,21 @@ void TConsole::check_directory(string dirname)
   }
 }
 
-void TConsole::check_file_good(ofstream& file, string filename)
-{
+void TConsole::check_file_good(ofstream& file, string filename) {
   if(!file.good())
   {
     throw string("Can't open file '"+filename+"'");
   }
 }
 
-void TConsole::check_file_good(ifstream& file, string filename)
-{
+void TConsole::check_file_good(ifstream& file, string filename) {
   if(!file.good())
   {
     throw string("Can't open file '"+filename+"'");
   }
 }
 
-void TConsole::confirmation_yes_no(string msg)
-{
+void TConsole::confirmation_yes_no(string msg) {
   while(true)
   {
     write_msg(msg+" [y/n]");
@@ -1066,8 +867,7 @@ void TConsole::confirmation_yes_no(string msg)
   }
 }
 
-void TConsole::check_file_exists(string filename)
-{
+void TConsole::check_file_exists(string filename) {
   if(file_exists(filename) && ! ecast(CP_bool("force_overwrite")))
   {
     while(true)
@@ -1095,8 +895,7 @@ void TConsole::check_file_exists(string filename)
   }
 }
 
-void TConsole::open_file(ofstream& fout, string filename)
-{
+void TConsole::open_file(ofstream& fout, string filename) {
   string path=filename;
   check_file_exists(path);
   fout.open(path);
@@ -1105,16 +904,14 @@ void TConsole::open_file(ofstream& fout, string filename)
   fout.precision(16);
 }
 
-void TConsole::open_file(ifstream& fin, string filename)
-{
+void TConsole::open_file(ifstream& fin, string filename) {
   string path=filename;
   fin.open(path);
   check_file_good(fin,filename);
   msg_eol("File '"+filename+"' is opened (read-mode)");
 }
 
-int TConsole::running_exp_count()
-{
+int TConsole::running_exp_count() {
   int count=0;
   for(int i=0; i<Experiments.length; i++)
   {
@@ -1124,8 +921,7 @@ int TConsole::running_exp_count()
 }
 
 
-int TConsole::undone_exp_count()
-{
+int TConsole::undone_exp_count() {
   int count=0;
   for(int i=0; i<Experiments.length; i++)
   {
@@ -1135,13 +931,11 @@ int TConsole::undone_exp_count()
   return count;
 }
 
-int TConsole::available_threads_number()
-{
+int TConsole::available_threads_number() {
   if(CP_int("max_threads_number")) return CP_int["max_threads_number"]; else return 4;
 }
 
-void TConsole::scheduler_init()
-{
+void TConsole::scheduler_init() {
   threads_count=0;
   pending_count=0;
   scheduler_terminate=false;
@@ -1149,8 +943,7 @@ void TConsole::scheduler_init()
   scheduler_thread_ptr=new boost::thread(&TConsole::scheduler_thread, this);
 }
 
-void TConsole::scheduler_thread()
-{
+void TConsole::scheduler_thread() {
   while(!scheduler_terminate)
   {
     /*for(int i=0; i<Experiments.length; i++)
@@ -1182,8 +975,7 @@ void TConsole::scheduler_thread()
   scheduler_terminate_done=true;
 }
 
-void TConsole::scheduler_term()
-{
+void TConsole::scheduler_term() {
   cout<<endl<<"Scheduler termination...";
   scheduler_terminate=true;
   while(!scheduler_terminate_done)
@@ -1194,8 +986,7 @@ void TConsole::scheduler_term()
   cout<<"done"<<endl;
 }
 
-bool TConsole::valid_char_for_parameter_name(char c)
-{
+bool TConsole::valid_char_for_parameter_name(char c) {
   return (c>='a' && c<='z') || (c>='A' && c<='Z') || (c>='0' && c<='9') || (c=='_');
 }
 
@@ -1206,8 +997,7 @@ OUTPUT: command line with all $(pname) and $pname
 replaced by the value of parameter.
 The value is similar to cmd_value output
 ********************************************/
-string TConsole::pname_parser(string cmdline)
-{
+string TConsole::pname_parser(string cmdline) {
   int L=cmdline.length();
   if(L==0 || cmdline[0]=='#') return cmdline;
   string res="";
