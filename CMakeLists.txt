@@ -25,11 +25,15 @@ find_package(OpenMP)
 if (OPENMP_FOUND)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+    set(CMAKE_EXE_LINKER_FLAGS 
+        "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}")
 endif()                              
 
-# GCC warnings
+# GCC warnings and optimizations
 if (UNIX)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -pedantic")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2")
+  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -s")
 endif()
 
 # Source folders
@@ -77,9 +81,11 @@ find_library(TECIO_LIBRARY
              PATHS ${TECPLOT_DIR}/lib
              NO_DEFAULT_PATH)
 
+
+find_package(Threads)
+
 set(LIBRARIES
-  pthread
-  gomp
+  ${CMAKE_THREAD_LIBS_INIT}
   ${Boost_LIBRARIES}
   ${TECIO_LIBRARY}
 )

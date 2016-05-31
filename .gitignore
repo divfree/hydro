@@ -209,6 +209,7 @@ hydro3/revision.cpp
 *.lock
 
 build.sh
+clean.sh
 
 # CMake
 CMakeCache.txt
