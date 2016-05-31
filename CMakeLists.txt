@@ -43,7 +43,7 @@ aux_source_directory(source/hydro2dmpi SOURCES_HYDRO_MODULE)
 aux_source_directory(source/test_module SOURCES_TEST_MODULE)
 aux_source_directory(source SOURCES_ROOT)
 
-set(SOURCES
+set(SOURCE_FILES
   ${SOURCES_COMMON}
   ${SOURCES_CONTROL}
   ${SOURCES_HYDRO_MODULE}
@@ -52,7 +52,7 @@ set(SOURCES
 )
 
 # Add target
-add_executable(${BINARY_NAME} ${SOURCES})
+add_executable(${BINARY_NAME} ${SOURCE_FILES})
 
 # C++11
 set_property(TARGET ${BINARY_NAME} PROPERTY CXX_STANDARD 11)
@@ -83,6 +83,15 @@ find_library(TECIO_LIBRARY
 
 
 find_package(Threads)
+
+# Revision tag
+add_custom_target(REVISION_TAG SOURCES "source/revision.cpp")
+add_custom_command(
+    TARGET REVISION_TAG
+    COMMAND ${CMAKE_SOURCE_DIR}/tools/update_git_rev.sh
+    COMMENT " Update Git revision"
+)
+add_dependencies(${BINARY_NAME} REVISION_TAG)
 
 set(LIBRARIES
   ${CMAKE_THREAD_LIBS_INIT}

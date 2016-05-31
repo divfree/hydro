@@ -204,9 +204,8 @@ local.properties
 # CDT-specific (C/C++ Development Tooling)
 .cproject
 
-# hydro3 revision
-hydro3/revision.cpp
-*.lock
+# revision tag
+source/revision.cpp
 
 build.sh
 clean.sh
