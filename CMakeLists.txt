@@ -80,7 +80,7 @@ set_property(TARGET ${BINARY_NAME} PROPERTY CXX_STANDARD_REQUIRED ON)
 
 # Static build
 if (STATIC_BUILD)
-  SET(CMAKE_FIND_LIBRARY_SUFFIXES .a .lib)
+  SET(CMAKE_FIND_LIBRARY_SUFFIXES .a)
   SET(BUILD_SHARED_LIBRARIES OFF)
   SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -static")
   set_property(TARGET ${BINARY_NAME} PROPERTY LINK_SEARCH_START_STATIC 1)
@@ -97,9 +97,10 @@ include_directories(
   ${TECPLOT_DIR}/include
 )
 find_library(TECIO_LIBRARY 
-             NAMES tecio.lib tecio.a
+             NAMES tecio
              PATHS ${TECPLOT_DIR}/lib
-             NO_DEFAULT_PATH)
+             NO_DEFAULT_PATH
+)
 
 find_package(Threads)
 

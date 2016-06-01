@@ -617,6 +617,7 @@ InterpolateSuperbee(
 
 template <class T, class Mesh>
 geom::FieldCell<T> Average(const geom::FieldFace<T>& ff_u, const Mesh& mesh) {
+  using Scal = typename Mesh::Scal;
   geom::FieldCell<T> res(mesh);
   for (IdxCell idxcell : mesh.Cells()) {
     T sum(0);
@@ -624,7 +625,7 @@ geom::FieldCell<T> Average(const geom::FieldFace<T>& ff_u, const Mesh& mesh) {
       IdxFace idxface = mesh.GetNeighbourFace(idxcell, i);
       sum += ff_u[idxface];
     }
-    res[idxcell] = sum / static_cast<Mesh::Scal>(mesh.GetNumNeighbourFaces(idxcell));
+    res[idxcell] = sum / static_cast<Scal>(mesh.GetNumNeighbourFaces(idxcell));
   }
   return res;
 }
@@ -777,7 +778,7 @@ struct LayersData {
         return iter_prev;
       }
       default: {
-        throw(std::exception("LayersData::Get(): Unknown layer"));
+        throw(std::runtime_error("LayersData::Get(): Unknown layer"));
       }
     }
   }
