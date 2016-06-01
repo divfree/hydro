@@ -778,7 +778,7 @@ class FluidSimple : public FluidSolver<Mesh> {
     fc_ext_force_restored_.Reinit(mesh);
 
 #pragma omp parallel for
-    for (size_t i = 0; i < mesh.Cells().size(); ++i) {
+    for (IntIdx i = 0; i < static_cast<IntIdx>(mesh.Cells().size()); ++i) {
       IdxCell idxcell(i);
     //for (auto idxcell : mesh.Cells()) {
       Vect sum = Vect::kZero;
@@ -815,7 +815,7 @@ class FluidSimple : public FluidSolver<Mesh> {
     timer_->Pop();
 
 #pragma omp parallel for
-    for (size_t i = 0; i < mesh.Cells().size(); ++i) {
+    for (IntIdx i = 0; i < static_cast<IntIdx>(mesh.Cells().size()); ++i) {
       IdxCell idxcell(i);
     //for (auto idxcell : mesh.Cells()) {
       fc_force_[idxcell] =
@@ -897,7 +897,7 @@ class FluidSimple : public FluidSolver<Mesh> {
     // TODO: Rename velocity_corr to smth
     // (it's actually full velocity not just correction)
 #pragma omp parallel for
-    for (size_t i = 0; i < mesh.Faces().size(); ++i) {
+    for (IntIdx i = 0; i < static_cast<IntIdx>(mesh.Faces().size()); ++i) {
       IdxFace idxface(i);
     //for (auto idxface : mesh.Faces()) {
       auto& expr = ff_volume_flux_corr_[idxface];
@@ -917,7 +917,7 @@ class FluidSimple : public FluidSolver<Mesh> {
 
     timer_->Push("fluid.5.pressure-system");
 #pragma omp parallel for
-    for (size_t i = 0; i < mesh.Cells().size(); ++i) {
+    for (IntIdx i = 0; i < static_cast<IntIdx>(mesh.Cells().size()); ++i) {
       IdxCell idxcell(i);
       auto& eqn = fc_pressure_corr_system_[idxcell];
       if (!mesh.IsExcluded(idxcell)) {
@@ -1018,7 +1018,7 @@ class FluidSimple : public FluidSolver<Mesh> {
 
       auto fc_velocity_delta = fc_velocity;
 #pragma omp parallel for
-      for (size_t rawcell = 0; rawcell < mesh.Cells().size(); ++rawcell) {
+      for (IntIdx rawcell = 0; rawcell < static_cast<IntIdx>(mesh.Cells().size()); ++rawcell) {
         IdxCell idxcell(rawcell);
         fc_velocity_delta[idxcell] -=
             conv_diff_solver_->GetVelocity(Layers::iter_prev)[idxcell];
@@ -1026,7 +1026,7 @@ class FluidSimple : public FluidSolver<Mesh> {
 
       geom::FieldCell<Vect> fc_evaluated(mesh);
 #pragma omp parallel for
-      for (size_t rawcell = 0; rawcell < mesh.Cells().size(); ++rawcell) {
+      for (IntIdx rawcell = 0; rawcell < static_cast<IntIdx>(mesh.Cells().size()); ++rawcell) {
         IdxCell idxcell(rawcell);
         for (size_t n = 0; n < dim; ++n) {
           fc_evaluated[idxcell][n] =
@@ -1043,7 +1043,7 @@ class FluidSimple : public FluidSolver<Mesh> {
 
       geom::FieldFace<Scal> ff_rhs(mesh, 0);
 #pragma omp parallel for
-      for (size_t rawface = 0; rawface < mesh.Faces().size(); ++rawface) {
+      for (IntIdx rawface = 0; rawface < static_cast<IntIdx>(mesh.Faces().size()); ++rawface) {
         IdxFace idxface(rawface);
         if (!is_boundary_[idxface] && !mesh.IsExcluded(idxface)) {
           Vect eval = ff_evaluated[idxface] - ff_ext_force_[idxface];
@@ -1056,7 +1056,7 @@ class FluidSimple : public FluidSolver<Mesh> {
       }
 
 #pragma omp parallel for
-      for (size_t rawcell = 0; rawcell < mesh.Cells().size(); ++rawcell) {
+      for (IntIdx rawcell = 0; rawcell < static_cast<IntIdx>(mesh.Cells().size()); ++rawcell) {
         IdxCell idxcell(rawcell);
         Scal sum = 0.;
         for (size_t i = 0; i < mesh.GetNumNeighbourFaces(idxcell); ++i) {

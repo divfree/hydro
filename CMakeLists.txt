@@ -1,5 +1,18 @@
 cmake_minimum_required(VERSION 3.1.0 FATAL_ERROR)
 
+# Static build flag
+if (DEFINED STATIC)
+  set(STATIC_BUILD ${STATIC})   
+else()
+  set(STATIC_BUILD ON)
+endif()
+
+# Static build for MSVC
+set(CMAKE_USER_MAKE_RULES_OVERRIDE
+   ${CMAKE_CURRENT_SOURCE_DIR}/c_flag_overrides.cmake)
+set(CMAKE_USER_MAKE_RULES_OVERRIDE_CXX
+   ${CMAKE_CURRENT_SOURCE_DIR}/cxx_flag_overrides.cmake)
+
 project("hydro")
 
 set(BINARY_NAME "hydro")
@@ -7,18 +20,25 @@ set(BINARY_NAME "hydro")
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)  
 
-# Static build flag
-set(STATIC_BUILD ${STATIC})   
-
 # Boost libraries
-set(Boost_USE_STATIC_RUNTIME ${STATIC_BUILD})
-set(Boost_USE_STATIC_LIBS ${STATIC_BUILD})
+set(Boost_USE_STATIC_RUNTIME ON)
+set(Boost_USE_STATIC_LIBS ON)
 set(Boost_USE_MULTITHREADED ON)
-find_package(Boost COMPONENTS system${BOOST_LIB_SUFFIX}
-                              filesystem${BOOST_LIB_SUFFIX}
-                              timer${BOOST_LIB_SUFFIX}
-                              thread${BOOST_LIB_SUFFIX}
-                              chrono${BOOST_LIB_SUFFIX} REQUIRED)
+find_package(Boost REQUIRED 
+  COMPONENTS system
+             filesystem
+             timer
+             thread
+             chrono
+             date_time 
+             atomic
+)
+link_directories(
+  ${Boost_LIBRARY_DIRS}
+)
+include_directories(
+  ${Boost_INCLUDE_DIRS}
+)
                      
 # OpenMP support                              
 find_package(OpenMP)
@@ -71,7 +91,7 @@ endif()
 if (DEFINED TECPLOT)
   set(TECPLOT_DIR ${TECPLOT})
 else()
-  set(TECPLOT_DIR "${CMAKE_SOURCE_DIR}/lib/tecio")
+  set(TECPLOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/lib/tecio")
 endif()
 include_directories(
   ${TECPLOT_DIR}/include
@@ -79,19 +99,27 @@ include_directories(
 find_library(TECIO_LIBRARY 
              NAMES tecio
              PATHS ${TECPLOT_DIR}/lib
-             NO_DEFAULT_PATH)
-
+             NO_DEFAULT_PATH
+)
 
 find_package(Threads)
 
 # Revision tag
 add_custom_target(REVISION_TAG SOURCES "source/revision.cpp")
-add_custom_command(
-    TARGET REVISION_TAG
-    COMMAND ${CMAKE_SOURCE_DIR}/tools/update_git_rev.sh
-    COMMENT " Update Git revision"
-)
 add_dependencies(${BINARY_NAME} REVISION_TAG)
+if (UNIX)
+  add_custom_command(
+    TARGET REVISION_TAG
+    COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tools/update_git_rev.sh
+    COMMENT " Update Git revision"
+  )
+else()
+  add_custom_command(
+    TARGET REVISION_TAG
+    COMMAND rem
+    COMMENT " Update Git revision (not implemented for Windows)"
+  )
+endif()
 
 set(LIBRARIES
   ${CMAKE_THREAD_LIBS_INIT}

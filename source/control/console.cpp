@@ -26,10 +26,7 @@ void TConsole::cmd_exit(string) {
 }
 
 void TConsole::cmd_echo(string arg) {
-  int i=0;
-  int n=arg.length();
-  while(i<n && arg[i]==' ') i++;
-  cout<<arg.substr(i)<<endl;
+  std::cout << arg;
 }
 
 void TConsole::cmd_add_experiment(string arg) {
@@ -998,12 +995,12 @@ replaced by the value of parameter.
 The value is similar to cmd_value output
 ********************************************/
 string TConsole::pname_parser(string cmdline) {
-  int L=cmdline.length();
+  size_t L=cmdline.length();
   if(L==0 || cmdline[0]=='#') return cmdline;
   string res="";
   const string& s=cmdline;
   int state=0;
-  int k=0;
+  size_t k=0;
   string P;
   while(state>=0)
   {

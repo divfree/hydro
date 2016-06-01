@@ -413,7 +413,7 @@ class SessionTecplotBinaryStructured : public SessionTecplotBinary {
     using namespace tecplotio;
 
     auto& field = entry->GetField();
-    INTEGER4 size = field.size();
+    INTEGER4 size = static_cast<INTEGER4>(field.size());
 
     INTEGER4 FieldIsDouble;
     if (sizeof(Scal) == 4) {
@@ -438,7 +438,7 @@ class SessionTecplotBinaryStructured : public SessionTecplotBinary {
     using namespace tecplotio;
 
     auto& field = entry->GetField();
-    INTEGER4 size = field.size();
+    INTEGER4 size = static_cast<INTEGER4>(field.size());
 
     INTEGER4 FieldIsDouble;
     if (sizeof(Scal) == 4) {
@@ -483,9 +483,9 @@ class SessionTecplotBinaryStructured : public SessionTecplotBinary {
     INTEGER4 ShrConn                  = 0;
 
     /*Ordered Zone Parameters*/
-    INTEGER4 IMax = b_nodes.GetDimensions()[0];
-    INTEGER4 JMax = b_nodes.GetDimensions()[1];
-    INTEGER4 KMax = (Mesh::dim == 2) ? 1 : b_nodes.GetDimensions()[2];
+    INTEGER4 IMax = static_cast<INTEGER4>(b_nodes.GetDimensions()[0]);
+    INTEGER4 JMax = static_cast<INTEGER4>(b_nodes.GetDimensions()[1]);
+    INTEGER4 KMax = static_cast<INTEGER4>((Mesh::dim == 2) ? 1 : b_nodes.GetDimensions()[2]);
 
     /*  Ordered Zone */
     INTEGER4 ZoneType = 0;

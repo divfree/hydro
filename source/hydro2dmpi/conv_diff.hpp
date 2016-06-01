@@ -151,7 +151,7 @@ class ConvectionDiffusionScalarImplicit :
     // Compute fluxes
     ff_flux_.Reinit(mesh, Expr());
 #pragma omp parallel for
-    for (size_t i = 0; i < mesh.Faces().size(); ++i) {
+    for (IntIdx i = 0; i < static_cast<IntIdx>(mesh.Faces().size()); ++i) {
       IdxFace idxface(i);
       if (!mesh.IsExcluded(idxface)) {
         Expr value_expr, derivative_expr;
@@ -172,7 +172,7 @@ class ConvectionDiffusionScalarImplicit :
     // Assemble the system
     fc_system_.Reinit(mesh);
 #pragma omp parallel for
-    for (size_t i = 0; i < mesh.Cells().size(); ++i) {
+    for (IntIdx i = 0; i < static_cast<IntIdx>(mesh.Cells().size()); ++i) {
       IdxCell idxcell(i);
       Expr& eqn = fc_system_[idxcell];
       if (!mesh.IsExcluded(idxcell)) {

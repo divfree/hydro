@@ -15,6 +15,7 @@ string get_string_with_ws(istream& in);
 string get_current_directory();
 void set_current_directory(string path);
 string IntToStr(int a);
+string IntToStr(size_t a);
 string DoubleToStr(double a, int precision=5);
 double StrToDouble(string s);
 bool directory_exists(string dirname);
