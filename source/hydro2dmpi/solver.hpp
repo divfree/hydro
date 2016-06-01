@@ -12,6 +12,8 @@
 #include <exception>
 #include <memory>
 
+using geom::IntIdx;
+
 template <class Scal>
 bool IsNan(Scal a) {
   return !(a * Scal(0) == Scal(0));
@@ -404,7 +406,7 @@ geom::FieldFace<T> Interpolate(const geom::FieldCell<T>& fc_u,
 
   if (geometric) {
 #pragma omp parallel for
-    for (size_t i = 0; i < mesh.Faces().size(); ++i) {
+    for (IntIdx i = 0; i < mesh.Faces().size(); ++i) {
       IdxFace idxface(i);
       if (mesh.IsInner(idxface)) {
         IdxCell cm = mesh.GetNeighbourCell(idxface, 0);
@@ -414,7 +416,7 @@ geom::FieldFace<T> Interpolate(const geom::FieldCell<T>& fc_u,
     }
   } else {
 #pragma omp parallel for
-    for (size_t i = 0; i < mesh.Faces().size(); ++i) {
+    for (IntIdx i = 0; i < mesh.Faces().size(); ++i) {
       IdxFace idxface(i);
       if (mesh.IsInner(idxface)) {
         IdxCell cm = mesh.GetNeighbourCell(idxface, 0);
@@ -658,8 +660,8 @@ geom::FieldCell<typename Mesh::Vect> Gradient(
   using Vect = typename Mesh::Vect;
   geom::FieldCell<Vect> res(mesh, Vect::kZero);
 #pragma omp parallel for
-  for (size_t i = 0; i < mesh.Cells().size(); ++i) {
-    IdxCell idxcell(i);
+  for (IntIdx rawcell = 0; rawcell < mesh.Cells().size(); ++rawcell) {
+    IdxCell idxcell(rawcell);
     if (!mesh.IsExcluded(idxcell)) {
       Vect sum = Vect::kZero;
       for (size_t i = 0; i < mesh.GetNumNeighbourFaces(idxcell); ++i) {

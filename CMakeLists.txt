@@ -14,11 +14,15 @@ set(STATIC_BUILD ${STATIC})
 set(Boost_USE_STATIC_RUNTIME ${STATIC_BUILD})
 set(Boost_USE_STATIC_LIBS ${STATIC_BUILD})
 set(Boost_USE_MULTITHREADED ON)
-find_package(Boost COMPONENTS system${BOOST_LIB_SUFFIX}
-                              filesystem${BOOST_LIB_SUFFIX}
-                              timer${BOOST_LIB_SUFFIX}
-                              thread${BOOST_LIB_SUFFIX}
-                              chrono${BOOST_LIB_SUFFIX} REQUIRED)
+find_package(Boost REQUIRED 
+  COMPONENTS system${BOOST_LIB_SUFFIX}
+             filesystem${BOOST_LIB_SUFFIX}
+             timer${BOOST_LIB_SUFFIX}
+             thread${BOOST_LIB_SUFFIX}
+             chrono${BOOST_LIB_SUFFIX} 
+             date_time${BOOST_LIB_SUFFIX} 
+             atomic${BOOST_LIB_SUFFIX} 
+)
                      
 # OpenMP support                              
 find_package(OpenMP)
@@ -66,6 +70,12 @@ if (STATIC_BUILD)
   set_property(TARGET ${BINARY_NAME} PROPERTY LINK_SEARCH_START_STATIC 1)
   set_property(TARGET ${BINARY_NAME} PROPERTY LINK_SEARCH_END_STATIC 1)
 endif()
+link_directories(
+  ${Boost_LINK_DIRS}
+)
+include_directories(
+  ${Boost_INCLUDE_DIRS}
+)
 
 # Tecplot
 if (DEFINED TECPLOT)
@@ -81,17 +91,24 @@ find_library(TECIO_LIBRARY
              PATHS ${TECPLOT_DIR}/lib
              NO_DEFAULT_PATH)
 
-
 find_package(Threads)
 
 # Revision tag
 add_custom_target(REVISION_TAG SOURCES "source/revision.cpp")
-add_custom_command(
+add_dependencies(${BINARY_NAME} REVISION_TAG)
+if (UNIX)
+  add_custom_command(
     TARGET REVISION_TAG
     COMMAND ${CMAKE_SOURCE_DIR}/tools/update_git_rev.sh
     COMMENT " Update Git revision"
-)
-add_dependencies(${BINARY_NAME} REVISION_TAG)
+  )
+else()
+  add_custom_command(
+    TARGET REVISION_TAG
+    COMMAND rem
+    COMMENT " Update Git revision (not implemented for Windows)"
+  )
+endif()
 
 set(LIBRARIES
   ${CMAKE_THREAD_LIBS_INIT}
