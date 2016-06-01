@@ -58,6 +58,12 @@ string IntToStr(int a)
   stream << a;
   return stream.str();
 }
+string IntToStr(size_t a)
+{
+  ostringstream stream;
+  stream << a;
+  return stream.str();
+}
 string DoubleToStr(double a, int precision)
 {
   ostringstream stream;
@@ -240,7 +246,7 @@ int round05(double a)
 
 int myround(double a)
 {
-  return round(a);
+  return round05(a);
 }
 
 bool in_rect(int i, int j, int i1, int j1, int i2, int j2)

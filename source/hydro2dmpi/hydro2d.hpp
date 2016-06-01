@@ -186,7 +186,7 @@ void hydro<Mesh>::InitMesh() {
 
   geom::InitUniformMesh(mesh, domain, mesh_size);
 
-  P_int.set("cells_number", mesh.GetNumCells());
+  P_int.set("cells_number", static_cast<int>(mesh.GetNumCells()));
 }
 
 template <class Mesh>
@@ -1101,7 +1101,7 @@ set int iter_history_sfixed 0*/
     content_iter = {
         std::make_shared<output::EntryScalarFunction<Scal>>(
             "iter", [this](){
-                return fluid_solver->GetIterationCount();
+                return static_cast<Scal>(fluid_solver->GetIterationCount());
             }),
         std::make_shared<output::EntryScalarFunction<Scal>>(
             "iter_diff_velocity", [this](){
@@ -1122,7 +1122,7 @@ set int iter_history_sfixed 0*/
       fluid_solver->MakeIteration();
 
       ++P_int["s_sum"];
-      P_int["s"] = fluid_solver->GetIterationCount();
+      P_int["s"] = static_cast<int>(fluid_solver->GetIterationCount());
 
       flog << ".....s=" << fluid_solver->GetIterationCount()
           << ", Rs=" << fluid_solver->GetConvergenceIndicator() << std::endl;

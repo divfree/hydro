@@ -35,7 +35,7 @@ class IdxGeneric {
   inline size_t GetRaw() const {
     return raw_;
   }
-  inline void AddRaw(int add) {
+  inline void AddRaw(IntIdx add) {
     raw_ += add;
   }
   inline bool operator==(IdxGeneric other) const {

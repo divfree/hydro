@@ -298,7 +298,7 @@ class DerivativeInnerFacePlain:
     IdxCell cp = mesh.GetNeighbourCell(idxface, 1);
     auto xm = mesh.GetCenter(cm);
     auto xp = mesh.GetCenter(cp);
-    Scal alpha = 1. / xp.dist(xm);
+    Scal alpha = Scal(1) / xp.dist(xm);
     expr.InsertTerm(-alpha, cm);
     expr.InsertTerm(alpha, cp);
     return expr;
@@ -406,7 +406,7 @@ geom::FieldFace<T> Interpolate(const geom::FieldCell<T>& fc_u,
 
   if (geometric) {
 #pragma omp parallel for
-    for (IntIdx i = 0; i < mesh.Faces().size(); ++i) {
+    for (IntIdx i = 0; i < static_cast<IntIdx>(mesh.Faces().size()); ++i) {
       IdxFace idxface(i);
       if (mesh.IsInner(idxface)) {
         IdxCell cm = mesh.GetNeighbourCell(idxface, 0);
@@ -416,7 +416,7 @@ geom::FieldFace<T> Interpolate(const geom::FieldCell<T>& fc_u,
     }
   } else {
 #pragma omp parallel for
-    for (IntIdx i = 0; i < mesh.Faces().size(); ++i) {
+    for (IntIdx i = 0; i < static_cast<IntIdx>(mesh.Faces().size()); ++i) {
       IdxFace idxface(i);
       if (mesh.IsInner(idxface)) {
         IdxCell cm = mesh.GetNeighbourCell(idxface, 0);
@@ -624,7 +624,7 @@ geom::FieldCell<T> Average(const geom::FieldFace<T>& ff_u, const Mesh& mesh) {
       IdxFace idxface = mesh.GetNeighbourFace(idxcell, i);
       sum += ff_u[idxface];
     }
-    res[idxcell] = sum / mesh.GetNumNeighbourFaces(idxcell);
+    res[idxcell] = sum / static_cast<Mesh::Scal>(mesh.GetNumNeighbourFaces(idxcell));
   }
   return res;
 }
@@ -660,7 +660,7 @@ geom::FieldCell<typename Mesh::Vect> Gradient(
   using Vect = typename Mesh::Vect;
   geom::FieldCell<Vect> res(mesh, Vect::kZero);
 #pragma omp parallel for
-  for (IntIdx rawcell = 0; rawcell < mesh.Cells().size(); ++rawcell) {
+  for (IntIdx rawcell = 0; rawcell < static_cast<IntIdx>(mesh.Cells().size()); ++rawcell) {
     IdxCell idxcell(rawcell);
     if (!mesh.IsExcluded(idxcell)) {
       Vect sum = Vect::kZero;
@@ -766,22 +766,20 @@ struct LayersData {
     switch (layer) {
       case Layers::time_curr: {
         return time_curr;
-        break;
       }
       case Layers::time_prev: {
         return time_prev;
-        break;
       }
       case Layers::iter_curr: {
         return iter_curr;
-        break;
       }
       case Layers::iter_prev: {
         return iter_prev;
-        break;
+      }
+      default: {
+        throw(std::exception("LayersData::Get(): Unknown layer"));
       }
     }
-    assert(false);
   }
   const T& Get(Layers layer) const {
     return const_cast<const T&>(const_cast<LayersData*>(this)->Get(layer));

@@ -31,6 +31,5 @@ unsigned int sup_power2(unsigned int a)
 
 double get_nan()
 {
-  double a=0.0;
-  return 0.0/a;
+  return nan("");
 }

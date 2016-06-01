@@ -118,7 +118,7 @@ hydro<Mesh>::hydro(TExperiment* _ex)
         mesh.GetBlockCells().GetIdx(midxoutput / output_factor);
   }
 
-  P_int.set("cells_number", mesh.GetNumCells());
+  P_int.set("cells_number", static_cast<int>(mesh.GetNumCells()));
 
 /*
   switch (linear_id) {
@@ -163,11 +163,11 @@ hydro<Mesh>::hydro(TExperiment* _ex)
   // Initial conditions and RHS
   fc_u_.Reinit(mesh, 0.);
   fc_f_.Reinit(mesh);
-  Scal freqhigh = P_double["freqhigh"];
-  Scal freqlow = P_double["freqlow"];
-  Scal ahigh = P_double["ahigh"];
-  Scal alow = P_double["alow"];
-  const Scal pi = std::atan(1.0) * 4;
+  const Scal freqhigh = static_cast<Scal>(P_double["freqhigh"]);
+  const Scal freqlow = static_cast<Scal>(P_double["freqlow"]);
+  const Scal ahigh = static_cast<Scal>(P_double["ahigh"]);
+  const Scal alow = static_cast<Scal>(P_double["alow"]);
+  const Scal pi = static_cast<Scal>(M_PI);
   for (auto idxcell : mesh.Cells()) {
     Vect x = mesh.GetCenter(idxcell);
     Vect mhigh = x * 2 * pi / domain_size * freqhigh;
@@ -284,7 +284,7 @@ hydro<Mesh>::hydro(TExperiment* _ex)
 
   auto P = [this](std::string entry, std::string parameter) {
     return std::make_shared<output::EntryScalarFunction<Scal>>(
-        entry, [this, parameter](){ return P_double[parameter]; });
+        entry, [this, parameter](){ return static_cast<Scal>(P_double[parameter]); });
   };
   content_scalar = { P("time", "t") };
 
