@@ -33,12 +33,9 @@ find_package(Boost REQUIRED
              date_time 
              atomic
 )
-link_directories(
-  ${Boost_LIBRARY_DIRS}
-)
-include_directories(
-  ${Boost_INCLUDE_DIRS}
-)
+link_directories(${Boost_LIBRARY_DIRS})
+include_directories(${Boost_INCLUDE_DIRS})
+set(LIBRARIES ${LIBRARIES} ${Boost_LIBRARIES})
                      
 # OpenMP support                              
 find_package(OpenMP)
@@ -80,11 +77,15 @@ set_property(TARGET ${BINARY_NAME} PROPERTY CXX_STANDARD_REQUIRED ON)
 
 # Static build
 if (STATIC_BUILD)
-  SET(CMAKE_FIND_LIBRARY_SUFFIXES .a .lib)
   SET(BUILD_SHARED_LIBRARIES OFF)
-  SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -static")
   set_property(TARGET ${BINARY_NAME} PROPERTY LINK_SEARCH_START_STATIC 1)
   set_property(TARGET ${BINARY_NAME} PROPERTY LINK_SEARCH_END_STATIC 1)
+  if (UNIX)
+    SET(CMAKE_FIND_LIBRARY_SUFFIXES .a)
+    SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -static")
+  else()
+    SET(CMAKE_FIND_LIBRARY_SUFFIXES .lib)
+  endif()
 endif()
 
 # Tecplot
@@ -93,16 +94,17 @@ if (DEFINED TECPLOT)
 else()
   set(TECPLOT_DIR "${CMAKE_SOURCE_DIR}/lib/tecio")
 endif()
-include_directories(
-  ${TECPLOT_DIR}/include
-)
+include_directories(${TECPLOT_DIR}/include)
 find_library(TECIO_LIBRARY 
              NAMES tecio
              PATHS ${TECPLOT_DIR}/lib
              NO_DEFAULT_PATH
 )
+set(LIBRARIES ${LIBRARIES} ${TECIO_LIBRARY})
 
+# Threads
 find_package(Threads)
+set(LIBRARIES ${LIBRARIES} ${CMAKE_THREAD_LIBS_INIT})
 
 # Revision tag
 add_custom_target(REVISION_TAG SOURCES "source/revision.cpp")
@@ -121,10 +123,4 @@ else()
   )
 endif()
 
-set(LIBRARIES
-  ${CMAKE_THREAD_LIBS_INIT}
-  ${Boost_LIBRARIES}
-  ${TECIO_LIBRARY}
-)
-
-target_link_libraries(${BINARY_NAME} ${LIBRARIES}) 
+target_link_libraries(${BINARY_NAME} ${LIBRARIES})
