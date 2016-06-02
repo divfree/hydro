@@ -7,6 +7,20 @@ else()
   set(STATIC_BUILD ON)
 endif()
 
+set(MODULE_HYDRO_2D ON)
+set(MODULE_HYDRO_3D ON)
+
+# Module selection
+if (MODULE_HYDRO_2D)
+  add_definitions("-DMODULE_HYDRO_2D")
+endif()
+if (MODULE_HYDRO_3D)
+  add_definitions("-DMODULE_HYDRO_3D")
+endif()
+if (MODULE_TEST)
+  add_definitions("-DMODULE_TEST")
+endif()
+
 # Static build for MSVC
 set(CMAKE_USER_MAKE_RULES_OVERRIDE
    ${CMAKE_CURRENT_SOURCE_DIR}/c_flag_overrides.cmake)

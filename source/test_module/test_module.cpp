@@ -8,8 +8,10 @@ namespace test_module
 
 namespace registrators {
 
+#ifdef MODULE_TEST
 ModuleRegistrator<hydro<geom::geom2d::MeshStructured<double>>>
 reg_double({"test"});
+#endif
 
 } // namespace registrators
 
