@@ -266,7 +266,7 @@ int sysinfo::virtual_usage_kb()
   string parname="";
   bool found=false;
 
-  while(!file.eof())
+  while(file.good() && !file.eof())
   {
     file>>parname;
     if(parname=="VmSize:")
@@ -292,7 +292,7 @@ int sysinfo::physical_usage_kb()
   string parname="";
   bool found=false;
 
-  while(!file.eof())
+  while(file.good() && !file.eof())
   {
     file>>parname;
     if(parname=="VmRSS:")
@@ -318,7 +318,7 @@ int sysinfo::threads()
   string parname="";
   bool found=false;
 
-  while(!file.eof())
+  while(file.good() && !file.eof())
   {
     file>>parname;
     if(parname=="Threads:")
