@@ -8,6 +8,8 @@
 #include <boost/thread/thread.hpp>
 #include <boost/timer/timer.hpp>
 #include "../control/metrics.hpp"
+#include <memory>
+#include <map>
 
 using boost::timer::cpu_timer;
 using boost::timer::cpu_times;
@@ -18,6 +20,7 @@ extern string Map_name[Map_number];
 
 class TConsole;
 class TModule;
+class ModuleFactory;
 
 namespace hydro2D_uniform
 {
@@ -64,7 +67,7 @@ public:
   ofstream flog;
   void logger(string msg);
 
-  std::unique_ptr<TModule> module;
+  std::shared_ptr<TModule> module;
 
   MultiTimer<std::string> timer_;
 
@@ -73,10 +76,17 @@ public:
   void term();
 
 private:
+  static std::map<std::string, std::shared_ptr<ModuleFactory>> module_map_;
   enum class MODULE {hydro2D_uniform, hydro3D_structured, proppant2D};
   void set_name();
   // Subsystems init/term functions
   void init_log();
+
+public:
+  static void RegisterModule(std::string name,
+                             std::shared_ptr<ModuleFactory> factory) {
+    module_map_[name] = factory;
+  }
 };
 
 class TExperiment_ref
@@ -124,6 +134,32 @@ class TModule : virtual public TExperiment_ref
   void write_step_header(double t);
   void write_step_header();
   void write_step_footer();
+};
+
+class ModuleFactory {
+ public:
+  virtual std::shared_ptr<TModule> Create(TExperiment* ex) const = 0;
+  virtual ~ModuleFactory() {}
+};
+
+template <class Module>
+class ModuleFactoryTemplate : public ModuleFactory {
+ public:
+  std::shared_ptr<TModule> Create(TExperiment* ex) const override {
+    return std::make_shared<Module>(ex);
+  }
+};
+
+template <class Module>
+class ModuleRegistrator {
+ public:
+  ModuleRegistrator(std::vector<std::string> name_aliases) {
+    std::shared_ptr<ModuleFactory> factory(
+        new ModuleFactoryTemplate<Module>());
+    for (auto name : name_aliases) {
+      TExperiment::RegisterModule(name, factory);
+    }
+  }
 };
 
 class Iterations : virtual private TExperiment_ref

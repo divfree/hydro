@@ -6,17 +6,8 @@
 #endif
 #include "../revision.hpp"
 
-namespace hydro2D_uniform_MPI {
-TModule* CreateHydro2dDouble(TExperiment*);
-TModule* CreateHydro3dDouble(TExperiment*);
-TModule* CreateHydro3dSingle(TExperiment*);
-} // namespace hydro2D_uniform_MPI
-namespace test_module
-{
-TModule* CreateTestDouble(TExperiment* ex);
-TModule* CreateTestSingle(TExperiment* ex);
-} // namespace test_module
 
+std::map<std::string, std::shared_ptr<ModuleFactory>> TExperiment::module_map_;
 
 string Map_name[Map_number]={"int", "double", "string", "bool", "vect"};
 
@@ -111,15 +102,8 @@ void TExperiment::init() {
   string module_name=P_string.exist("MODULE") ? P_string["MODULE"]
                                               : "hydro2D_uniform_MPI";
 
-  if(module_name=="hydro2D_uniform_MPI") {
-    module=std::unique_ptr<TModule>(
-        hydro2D_uniform_MPI::CreateHydro2dDouble(this));
-  } else if(module_name=="hydro3D_uniform_MPI") {
-    module=std::unique_ptr<TModule>(
-        hydro2D_uniform_MPI::CreateHydro3dDouble(this));
-  } else if(module_name=="test") {
-    module=std::unique_ptr<TModule>(
-        test_module::CreateTestDouble(this));
+  if (module_map_.count(module_name)) {
+    module = module_map_[module_name]->Create(this);
   } else {
     throw string("Unknown module '"+module_name+"'");
   }

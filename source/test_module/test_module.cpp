@@ -3,17 +3,15 @@
 ********************************************************************/
 #include "test_module.hpp"
 
-
 namespace test_module
 {
 
-TModule* CreateTestDouble(TExperiment* ex) {
-  return new hydro<geom::geom2d::MeshStructured<double>>(ex); 
-}
+namespace registrators {
 
-TModule* CreateTestSingle(TExperiment* ex) {
-  return new hydro<geom::geom2d::MeshStructured<float>>(ex);
-}
+ModuleRegistrator<hydro<geom::geom2d::MeshStructured<double>>>
+reg_double({"test"});
+
+} // namespace registrators
 
 } // namespace test_module
 

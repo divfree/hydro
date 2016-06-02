@@ -7,21 +7,15 @@
 namespace hydro2D_uniform_MPI
 {
 
-TModule* CreateHydro2dDouble(TExperiment* ex) {
-  return new hydro<geom::geom2d::MeshStructured<double>>(ex);
-}
+namespace registrators {
 
-//TModule* CreateHydro2dSingle(TExperiment* ex) {
-//  return new hydro<geom::geom2d::MeshStructured<float>>(ex);
-//}
+ModuleRegistrator<hydro<geom::geom2d::MeshStructured<double>>>
+reg_2d_double({"hydro2D_uniform_MPI", "hydro2d"});
 
-TModule* CreateHydro3dDouble(TExperiment* ex) {
-  return new hydro<geom::geom3d::MeshStructured<double>>(ex);
-}
+ModuleRegistrator<hydro<geom::geom3d::MeshStructured<double>>>
+reg_3d_double({"hydro3D_uniform_MPI", "hydro3d"});
 
-//TModule* CreateHydro3dSingle(TExperiment* ex) {
-//  return new hydro<geom::geom3d::MeshStructured<float>>(ex);
-//}
+} // namespace registrators
 
 // namespace end
 }
