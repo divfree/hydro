@@ -1,0 +1,174 @@
+set string MODULE hydro2D_uniform_MPI
+
+set string plt_title "Template"
+
+# domain
+set vect A (0, 0, 0)
+set vect B (1, 1, 1)
+
+# rect with c1=1
+set vect A1 (0, 0, 0)
+set vect B1 (0, 0, 1)
+
+# rect with c2=1
+set vect A2 (0, 0, 0)
+set vect B2 (0, 0, 1)
+
+# rigid box
+set vect box_A (0, 0)
+set vect box_B (0, 0)
+
+# mesh
+set int Nx 100
+set int Ny 100
+set int Nz 5
+
+# time
+set double T 1
+set double dt 0.01
+
+# physical parameters
+set int num_phases 1
+set vect gravity (0., 0, 0)
+set double density_0 1
+set double density_1 1
+set double density_2 1
+set double viscosity_0 1
+set double viscosity_1 1
+set double viscosity_2 1
+set double molar_0 1
+set double molar_1 1
+set double molar_2 1
+set bool deforming_velocity 0
+set vect initial_velocity (0, 0)
+
+# boundary conditions
+set string condition_top    "wall 0 0 0"
+set string condition_bottom "wall 0 0 0"
+set string condition_left   "wall 0 0 0"
+set string condition_right  "wall 0 0 0"
+set string condition_close  "wall 0 0 0"
+set string condition_far    "wall 0 0 0"
+
+# chemistry
+set string chemistry steady
+set double chem_intensity 0
+set vect reaction_zone_lb (0, 0, 0)
+set vect reaction_zone_rt (0, 0, 0)
+
+# radiation
+set bool radiation_enable 0
+set double radiation_intensity 1
+set vect radiation_direction (0,-1, 0)
+set vect radiation_box_lb (0.07, 0.04, -0.01)
+set vect radiation_box_rt (0.13, 0.06, 0.01)
+set double absorption_rate_0 100
+set double absorption_rate_1 0
+set double absorption_rate_2 0
+
+# heat
+set bool heat_enable 0
+set string linear_solver_heat lu
+set vect heat_box_lb (0, 0, 0)
+set vect heat_box_rt (0, 0, 0)
+set double conductivity_0 1
+set double conductivity_1 1
+set double conductivity_2 1
+set double temperature_initial 0
+set double heat_box_temperature 0
+set double heat_relaxation_factor 1.
+set bool time_second_order_heat 1
+
+# incompressibility
+set double incompressible_relaxation 0
+set double temperature_expansion_rate_0 0
+set double temperature_expansion_rate_1 0
+set double temperature_expansion_rate_2 0
+set double temperature_expansion_base_0 0
+set double temperature_expansion_base_1 0
+set double temperature_expansion_base_2 0
+
+# numerical parameters
+set bool fluid_enable 1
+set bool advection_enable 1
+set string advection_solver tvd
+set double advection_dt_factor 0.1
+set bool tvd_split 0
+set double convergence_tolerance 1e-2
+set int num_iterations_limit 10
+set double velocity_relaxation_factor 0.8
+set double pressure_relaxation_factor 0.9
+set string linear_solver_velocity lu
+set string linear_solver_pressure gauss_seidel
+set double lu_relaxed_relaxation_factor 1.9
+set int lu_relaxed_num_iters_limit 1000
+set double lu_relaxed_tolerance 1e-3
+# set vect pressure_fixed_point (0, 0, 0)
+# set double pressure_fixed_value 0
+set bool time_second_order 1
+set double rhie_chow_factor 1
+set bool simpler 0
+set int initial_volume_fraction_smooth_times 2
+set int density_smooth_times 2
+set int viscosity_smooth_times 2
+set int force_smooth_times 0
+set bool force_geometric_average 0
+set double guess_extrapolation 0
+#set double antidiffusion_factor 0
+
+# particles
+set double spawning_gap 0.25
+set double particle_radius 1.5
+set int min_num_particles 3
+set int max_num_particles 10
+set double back_relaxation_factor 1
+
+# output
+set int max_frame_index 100
+set int max_frame_scalar_index 10000
+set bool no_output 0
+set bool no_mesh_output 0
+set double SA_threshold 0
+set bool stat_s_enable 1
+#set double Tstart_frames 0
+set int output_factor_x 1
+set int output_factor_y 1
+set int output_factor_z 1
+set bool output_x 1
+set bool output_y 1
+set bool output_z 0
+set bool output_velocity_x 1
+set bool output_velocity_y 1
+set bool output_velocity_z 0
+set bool output_pressure 1
+set bool output_density 0
+set bool output_viscosity 0
+set bool output_radiation 0
+set bool output_temperature 0
+set bool output_divergence 0
+set bool output_mass_source_0 0
+set bool output_mass_source_1 0
+set bool output_mass_source_2 0
+set bool output_mass_fraction_0 0
+set bool output_mass_fraction_1 0
+set bool output_mass_fraction_2 0
+set bool output_volume_fraction_0 1
+set bool output_volume_fraction_1 1
+set bool output_volume_fraction_2 0
+set bool output_density_0 0
+set bool output_density_1 0
+set bool output_density_2 0
+set bool output_partial_density_0 0
+set bool output_partial_density_1 0
+set bool output_partial_density_2 0
+set bool output_target_density_0 0
+set bool output_target_density_1 0
+set bool output_target_density_2 0
+set bool output_volume_source 0
+set bool output_excluded 0
+
+# iterations history
+set bool iter_history_enable 0
+set bool iter_history_mesh 0
+set int iter_history_n 1
+set int iter_history_sfixed 0

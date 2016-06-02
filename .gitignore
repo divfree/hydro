@@ -215,3 +215,6 @@ CMakeCache.txt
 CMakeFiles/
 Makefile
 cmake_install.cmake
+
+# hydro examples
+examples/

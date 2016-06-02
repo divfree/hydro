@@ -1,0 +1,15 @@
+set c_bool force_overwrite 1
+set c_bool force_yes 1
+set c_int max_threads_number 2
+
+#open_log console.log
+
+ae exp1
+
+set string name exp
+
+run ../general.hydroconf
+run broken_dam.hydroconf
+
+init
+start

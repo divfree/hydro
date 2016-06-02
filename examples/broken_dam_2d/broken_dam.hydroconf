@@ -1,0 +1,31 @@
+set string plt_title "Broken dam"
+
+# domain
+set vect A (0, 0)
+set vect B (1.25,0.7)
+
+# rect with c1=1
+set vect A1 (0., 0.)
+set vect B1 (0.2, 0.25)
+
+# mesh
+set int Nx 142
+set int Ny 80
+
+# time
+set double T 0.6
+set double dt 0.0025
+
+# physical parameters
+set int num_phases 2
+set vect gravity (0., -10, 0)
+set double density_0 1.255
+set double density_1 1000
+set double viscosity_0 1.7e-05
+set double viscosity_1 0.001
+
+# numerical parameters
+set int initial_volume_fraction_smooth_times 2
+set int density_smooth_times 3
+set int viscosity_smooth_times 3
+set bool simpler 0
