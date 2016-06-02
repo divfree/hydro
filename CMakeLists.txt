@@ -7,10 +7,15 @@ else()
   set(STATIC_BUILD ON)
 endif()
 
-set(MODULE_HYDRO_2D ON)
-set(MODULE_HYDRO_3D ON)
+# Default module selection
+if (NOT DEFINED MODULE_HYDRO_2D)
+  set(MODULE_HYDRO_2D ON)
+endif()
+if (NOT DEFINED MODULE_HYDRO_3D)
+  set(MODULE_HYDRO_3D ON)
+endif()
 
-# Module selection
+# Module selection definitions
 if (MODULE_HYDRO_2D)
   add_definitions("-DMODULE_HYDRO_2D")
 endif()
