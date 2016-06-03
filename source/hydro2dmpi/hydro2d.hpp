@@ -363,14 +363,16 @@ void hydro<Mesh>::InitAdvectionSolver() {
     v_fc_mass_source[i].Reinit(mesh, 0.);
     v_fc_velocity_slip[i].Reinit(mesh);
     v_ff_volume_flux_slip[i].Reinit(mesh);
-    v_fc_volume_fraction[i].Reinit(mesh, 0.);
+    v_fc_volume_fraction[i].Reinit(mesh);
     v_fc_density_target[i].Reinit(mesh, v_density[i]);
     v_fc_density[i].Reinit(mesh, v_density[i]);
-    v_fc_partial_density_initial[i].Reinit(mesh, 0.);
+    v_fc_partial_density_initial[i].Reinit(
+        mesh, v_density[i] *
+        ecast(P_double("initial_volume_fraction_" + IntToStr(i))));
     v_p_ff_volume_flux_slip[i] = &v_ff_volume_flux_slip[i];
   }
 
-  // Initial concentration for phases [1, num_phases)
+  // Initial partial density for phases [1, num_phases)
   geom::Rect<Vect> block1(GetVect<Vect>(P_vect["A1"]),
                     GetVect<Vect>(P_vect["B1"]));
   geom::Rect<Vect> block2(GetVect<Vect>(P_vect["A2"]),
@@ -390,7 +392,7 @@ void hydro<Mesh>::InitAdvectionSolver() {
                                P_int["initial_volume_fraction_smooth_times"]);
   }
 
-  // Initial concentration of 0-phase compensates the others
+  // Initial partial density of 0-phase compensates the others
   for (auto idx : mesh.Cells()) {
     Scal volume_sum = 0.;
     for (size_t i = 1; i < num_phases; ++i) {
