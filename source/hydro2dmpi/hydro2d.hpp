@@ -836,6 +836,8 @@ void hydro<Mesh>::CalcPhaseVelocitySlip() {
   auto v_enable_settling = GetPhasePropertyFlag("enable_settling_");
   auto v_bubble_radius = GetPhaseProperty("bubble_radius_", v_enable_settling);
 
+  bool velocity_is_carrier = flag("velocity_is_carrier");
+
   for (auto idxcell : mesh.Cells()) {
     // Calc phase velocities relative to carrier velocity
     // using the Stokes law
@@ -854,43 +856,73 @@ void hydro<Mesh>::CalcPhaseVelocitySlip() {
       }
     }
 
-    // Calc carrier velocity relative to mixture velocity
-    Vect carrier_velocity_relative_to_mixture = Vect::kZero;
-    for (auto i : phases) {
-      carrier_velocity_relative_to_mixture +=
-          v_velocity_relative_to_carrier[i] *
-          v_fc_volume_fraction[i][idxcell];
-    }
+    if (!velocity_is_carrier) {
+      // Calc carrier velocity relative to mixture velocity
+      Vect carrier_velocity_relative_to_mixture = Vect::kZero;
+      for (auto i : phases) {
+        carrier_velocity_relative_to_mixture +=
+            v_velocity_relative_to_carrier[i] *
+            v_fc_volume_fraction[i][idxcell];
+      }
 
-    // Calc phase velocities relative to mixture velocity
-    for (auto i : phases) {
-      v_fc_velocity_slip[i][idxcell] =
-          v_velocity_relative_to_carrier[i] -
-          carrier_velocity_relative_to_mixture;
+      // Calc phase velocities relative to mixture velocity
+      for (auto i : phases) {
+        v_fc_velocity_slip[i][idxcell] =
+            v_velocity_relative_to_carrier[i] -
+            carrier_velocity_relative_to_mixture;
+      }
+    } else {
+      for (auto i : phases) {
+        v_fc_velocity_slip[i][idxcell] = v_velocity_relative_to_carrier[i];
+      }
     }
   }
 
   // Calc volume flux slip on faces
-  // (interpolation and correction to make average flux zero)
   for (auto idxface : mesh.Faces()) {
     if (mesh.IsInner(idxface)) {
-      Scal aver = 0.;
       for (auto i : phases) {
         v_ff_volume_flux_slip[i][idxface] =
             solver::GetInterpolatedInner(
                 v_fc_velocity_slip[i], idxface, mesh).dot(
                     mesh.GetSurface(idxface));
-        Scal c = solver::GetInterpolatedInner(
-            v_fc_volume_fraction[i], idxface, mesh);
-        aver += c * v_ff_volume_flux_slip[i][idxface];
-      }
-      for (auto i : phases) {
-        v_ff_volume_flux_slip[i][idxface] -= aver;
       }
     } else {
       for (auto i : phases) {
         v_ff_volume_flux_slip[i][idxface] = 0.;
       }
+    }
+  }
+
+  if (!velocity_is_carrier) {
+    // Correct volume flux slip to make average flux zero
+    for (auto idxface : mesh.Faces()) {
+      if (mesh.IsInner(idxface)) {
+        Scal aver = 0.;
+        for (auto i : phases) {
+          Scal c = solver::GetInterpolatedInner(
+              v_fc_volume_fraction[i], idxface, mesh);
+          aver += c * v_ff_volume_flux_slip[i][idxface];
+        }
+        for (auto i : phases) {
+          v_ff_volume_flux_slip[i][idxface] -= aver;
+        }
+      }
+    }
+  } else {
+    // Add carrier volume flux
+    for (auto idxcell : mesh.Cells()) {
+      Scal div = 0.;
+      for (auto i : phases) {
+        Scal c = v_fc_volume_fraction[i][idxcell];
+        for (size_t faceid = 0; faceid < mesh.GetNumNeighbourFaces(idxcell);
+            ++faceid) {
+          auto idxface = mesh.GetNeighbourFace(idxcell, faceid);
+          div += c * v_ff_volume_flux_slip[i][idxface] *
+              mesh.GetOutwardFactor(idxcell, faceid);
+        }
+      }
+      fc_volume_source[idxcell] -= div / mesh.GetVolume(idxcell);
     }
   }
 }
