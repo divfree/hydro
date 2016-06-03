@@ -162,7 +162,8 @@ void TConsole::exp_create_thread(TExperiment* experiment) {
   TExperiment &cur_exp=*experiment;
   if(cur_exp.st_pending)
   {
-    cur_exp.thread_ptr=std::make_shared<std::thread>(&TExperiment::thread, &cur_exp);
+    cur_exp.thread_ptr =
+        std::make_shared<std::thread>(&TExperiment::thread, &cur_exp);
     cur_exp.st_pending=false;
     cur_exp.st_thread=true;
     pending_count--;
@@ -939,7 +940,8 @@ void TConsole::scheduler_init() {
   pending_count=0;
   scheduler_terminate=false;
   scheduler_terminate_done=false;
-  scheduler_thread_ptr = std::make_shared<std::thread>(&TConsole::scheduler_thread, this);
+  scheduler_thread_ptr =
+      std::make_shared<std::thread>(&TConsole::scheduler_thread, this);
 }
 
 void TConsole::scheduler_thread() {
@@ -969,7 +971,7 @@ void TConsole::scheduler_thread() {
         k++;
       }
     }
-    sleep(1); // sleep for 1 second
+    sleep_ms(100);
   }
   scheduler_terminate_done=true;
 }
@@ -977,11 +979,7 @@ void TConsole::scheduler_thread() {
 void TConsole::scheduler_term() {
   cout<<endl<<"Scheduler termination...";
   scheduler_terminate=true;
-  while(!scheduler_terminate_done)
-  {
-    sleep_ms(100); // sleep for 100 ms
-    cout<<".";
-  }
+  scheduler_thread_ptr->join();
   cout<<"done"<<endl;
 }
 

@@ -209,5 +209,5 @@ void TExperiment::logger(string msg)
 
 TExperiment::~TExperiment()
 {
-
+  thread_ptr->join();
 }

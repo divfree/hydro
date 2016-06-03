@@ -79,6 +79,7 @@ void PVar::step(int depth)
 
 void PVar::term()
 {
+  thread_ptr->join();
   table_close();
 }
 

@@ -8,6 +8,7 @@
 #include "../common/linear_algebra.hpp"
 #include <thread>
 #include <memory>
+#include <atomic>
 
 class TConsole;
 class TExperiment;
@@ -43,7 +44,7 @@ public:
   void term();
   std::shared_ptr<std::thread> thread_ptr;
   int variations_count;
-  bool running;
+  std::atomic<bool> running;
   ofstream ftable;
   column<string> table_columns;
   void table_open(string arg);

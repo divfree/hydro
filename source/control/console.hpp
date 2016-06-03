@@ -5,6 +5,7 @@
 #include <boost/filesystem.hpp>
 #include "experiment.hpp"
 #include "pvar.hpp"
+#include <atomic>
 
 #define CMap_number 4
 extern string Map_name[Map_number];
@@ -105,8 +106,8 @@ public:
   void scheduler_thread();
   std::shared_ptr<std::thread> scheduler_thread_ptr;
   void scheduler_term();
-  bool scheduler_terminate;
-  bool scheduler_terminate_done;
+  std::atomic<bool> scheduler_terminate;
+  std::atomic<bool> scheduler_terminate_done;
   int threads_count;
   int pending_count;
 
