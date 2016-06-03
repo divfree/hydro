@@ -1,5 +1,9 @@
 cmake_minimum_required(VERSION 3.1.0 FATAL_ERROR)
 
+# Default revision tag
+file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/tools/revision.cpp"
+     DESTINATION "${CMAKE_CURRENT_SOURCE_DIR}/source")
+
 # Static build flag
 if (DEFINED STATIC)
   set(STATIC_BUILD ${STATIC})   
@@ -89,6 +93,23 @@ set(SOURCE_FILES
 
 # Add target
 add_executable(${BINARY_NAME} ${SOURCE_FILES})
+     
+# Revision tag target
+add_custom_target(REVISION_TAG SOURCES "source/revision.cpp")
+add_dependencies(${BINARY_NAME} REVISION_TAG)
+if (UNIX)
+  add_custom_command(
+    TARGET REVISION_TAG
+    COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tools/update_git_rev.sh
+    COMMENT " Update Git revision"
+  )
+else()
+  add_custom_command(
+    TARGET REVISION_TAG
+    COMMAND rem
+    COMMENT " Update Git revision (not implemented for Windows)"
+  )
+endif()
 
 # C++11
 set_property(TARGET ${BINARY_NAME} PROPERTY CXX_STANDARD 11)
@@ -111,7 +132,7 @@ endif()
 if (DEFINED TECPLOT)
   set(TECPLOT_DIR ${TECPLOT})
 else()
-  set(TECPLOT_DIR "${CMAKE_SOURCE_DIR}/lib/tecio")
+  set(TECPLOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/lib/tecio")
 endif()
 include_directories(${TECPLOT_DIR}/include)
 find_library(TECIO_LIBRARY 
@@ -124,22 +145,5 @@ set(LIBRARIES ${LIBRARIES} ${TECIO_LIBRARY})
 # Threads
 find_package(Threads)
 set(LIBRARIES ${LIBRARIES} ${CMAKE_THREAD_LIBS_INIT})
-
-# Revision tag
-add_custom_target(REVISION_TAG SOURCES "source/revision.cpp")
-add_dependencies(${BINARY_NAME} REVISION_TAG)
-if (UNIX)
-  add_custom_command(
-    TARGET REVISION_TAG
-    COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tools/update_git_rev.sh
-    COMMENT " Update Git revision"
-  )
-else()
-  add_custom_command(
-    TARGET REVISION_TAG
-    COMMAND rem
-    COMMENT " Update Git revision (not implemented for Windows)"
-  )
-endif()
 
 target_link_libraries(${BINARY_NAME} ${LIBRARIES})
