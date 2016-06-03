@@ -16,9 +16,6 @@
 #include "fluid.hpp"
 #include "chemistry.hpp"
 
-using boost::timer::cpu_timer;
-using boost::timer::cpu_times;
-using boost::timer::nanosecond_type;
 
 // TODO: Change parameters on events (e.g. certain time moments)
 

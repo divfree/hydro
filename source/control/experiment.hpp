@@ -5,15 +5,11 @@
 #include "../common/linear_algebra.hpp"
 #include "../common/data_structures.hpp"
 #include "../common/common.hpp"
-#include <boost/thread/thread.hpp>
-#include <boost/timer/timer.hpp>
+#include <thread>
+#include <chrono>
 #include "../control/metrics.hpp"
 #include <memory>
 #include <map>
-
-using boost::timer::cpu_timer;
-using boost::timer::cpu_times;
-using boost::timer::nanosecond_type;
 
 #define Map_number 5
 extern string Map_name[Map_number];
@@ -60,7 +56,7 @@ public:
   bool uflag(string flag_name); // flag() without existence check, direct access by name
 
   void thread();
-  std::unique_ptr<boost::thread> thread_ptr;
+  std::shared_ptr<std::thread> thread_ptr;
 
   void open_file(ofstream& fout, string filename);
   void open_file(ifstream& fin, string filename);
@@ -130,7 +126,7 @@ class TModule : virtual public TExperiment_ref
   virtual void step()=0;
   void cycle();
   void init_step_time();
-  void update_step_time(cpu_timer& timer);
+  void update_step_time(double seconds);
   void write_step_header(double t);
   void write_step_header();
   void write_step_footer();

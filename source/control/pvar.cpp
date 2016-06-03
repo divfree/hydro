@@ -22,7 +22,7 @@ void PVar::init()
 
 void PVar::start()
 {
-  thread_ptr=new boost::thread(&PVar::thread, this);
+  thread_ptr = std::make_shared<std::thread>(&PVar::thread, this);
   running=true;
 }
 

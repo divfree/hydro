@@ -1,13 +1,15 @@
 #include "console.hpp"
+#include <chrono>
+#include <thread>
 
 string CMap_name[Map_number]={"c_bool", "c_double", "c_int", "c_string"};
 
 void sleep(int seconds) {
-  boost::this_thread::sleep(boost::posix_time::seconds(seconds));
+  std::this_thread::sleep_for(std::chrono::seconds(seconds));
 }
 
 void sleep_ms(int ms) {
-  boost::this_thread::sleep(boost::posix_time::milliseconds(ms));
+  std::this_thread::sleep_for(std::chrono::milliseconds(ms));
 }
 
 void TConsole::cmd_exit(string) {
@@ -160,7 +162,7 @@ void TConsole::exp_create_thread(TExperiment* experiment) {
   TExperiment &cur_exp=*experiment;
   if(cur_exp.st_pending)
   {
-    cur_exp.thread_ptr=std::unique_ptr<boost::thread>(new boost::thread(&TExperiment::thread, &cur_exp));
+    cur_exp.thread_ptr=std::make_shared<std::thread>(&TExperiment::thread, &cur_exp);
     cur_exp.st_pending=false;
     cur_exp.st_thread=true;
     pending_count--;
@@ -937,7 +939,7 @@ void TConsole::scheduler_init() {
   pending_count=0;
   scheduler_terminate=false;
   scheduler_terminate_done=false;
-  scheduler_thread_ptr=new boost::thread(&TConsole::scheduler_thread, this);
+  scheduler_thread_ptr = std::make_shared<std::thread>(&TConsole::scheduler_thread, this);
 }
 
 void TConsole::scheduler_thread() {

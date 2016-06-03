@@ -1,5 +1,6 @@
 #include "experiment.hpp"
 #include "console.hpp"
+#include "metrics.hpp"
 
 void TModule::init_step_time()
 {
@@ -19,12 +20,10 @@ TModule::TModule(TExperiment* _ex) : TExperiment_ref(_ex)
   init_step_time();
 }
 
-void TModule::update_step_time(cpu_timer& timer)
-{
-  double sec= get_seconds_count(timer);
-  ex->P_double["last_step_time"]=sec;
-  ex->P_double["total_step_time"]+=sec;
-  ex->P_double["memory"]=sysinfo::physical_usage_kb()/1000.0;
+void TModule::update_step_time(double seconds) {
+  ex->P_double["last_step_time"] = seconds;
+  ex->P_double["total_step_time"] += seconds;
+  ex->P_double["memory"] = sysinfo::physical_usage_kb()/1000.0;
 }
 
 
@@ -46,7 +45,7 @@ void TModule::cycle()
 {
   if(!ex->st_finished)
   {
-    cpu_timer timer;
+    SingleTimer timer;
 
     write_step_header();
 
@@ -60,7 +59,7 @@ void TModule::cycle()
 
     write_results(ex->st_finished);
 
-    update_step_time(timer);
+    update_step_time(timer.GetSeconds());
 
     write_step_footer();
 

@@ -11,6 +11,18 @@
 #include <stack>
 #include <chrono>
 
+class SingleTimer {
+  using Clock =  std::chrono::steady_clock;
+  Clock clock_;
+  Clock::time_point start_;
+ public:
+  SingleTimer() :
+    start_(clock_.now()) {}
+  double GetSeconds() const {
+    return std::chrono::duration<double>(clock_.now() - start_).count();
+  }
+};
+
 template <class Attr>
 class MultiTimer {
   using Clock =  std::chrono::steady_clock;

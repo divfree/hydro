@@ -50,11 +50,6 @@ set(Boost_USE_MULTITHREADED ON)
 find_package(Boost REQUIRED 
   COMPONENTS system
              filesystem
-             timer
-             thread
-             chrono
-             date_time 
-             atomic
 )
 link_directories(${Boost_LIBRARY_DIRS})
 include_directories(${Boost_INCLUDE_DIRS})

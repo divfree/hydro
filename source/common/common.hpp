@@ -2,13 +2,7 @@
 
 #include <cmath>
 #include <boost/filesystem.hpp>
-#include <boost/timer/timer.hpp>
-#include <boost/math/special_functions/round.hpp>
 #include "std_ref.hpp"
-
-using boost::timer::cpu_timer;
-using boost::timer::cpu_times;
-using boost::timer::nanosecond_type;
 
 string get_time(string fmt);
 string get_string_with_ws(istream& in);
@@ -81,8 +75,6 @@ namespace sysinfo
   int physical_usage_kb();
   int threads();
 }
-
-double get_seconds_count(cpu_timer& timer);
 
 double pow3(double a);
 double pow4(double a);

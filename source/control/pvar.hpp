@@ -6,7 +6,8 @@
 
 #include "../common/common.hpp"
 #include "../common/linear_algebra.hpp"
-#include <boost/thread/thread.hpp>
+#include <thread>
+#include <memory>
 
 class TConsole;
 class TExperiment;
@@ -40,7 +41,7 @@ public:
   void thread();
   void step(int depth);
   void term();
-  boost::thread* thread_ptr;
+  std::shared_ptr<std::thread> thread_ptr;
   int variations_count;
   bool running;
   ofstream ftable;

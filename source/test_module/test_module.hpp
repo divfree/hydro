@@ -13,10 +13,6 @@
 #include "../hydro2dmpi/solver.hpp"
 #include <memory>
 
-using boost::timer::cpu_timer;
-using boost::timer::cpu_times;
-using boost::timer::nanosecond_type;
-
 // TODO: Change parameters on events (e.g. certain time moments)
 
 namespace test_module

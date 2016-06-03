@@ -2,15 +2,9 @@
 
 #include "../common/std_ref.hpp"
 #include "../common/data_structures.hpp"
-#include <boost/thread/thread.hpp>
-#include <boost/timer/timer.hpp>
 #include <boost/filesystem.hpp>
 #include "experiment.hpp"
 #include "pvar.hpp"
-
-using boost::timer::cpu_timer;
-using boost::timer::cpu_times;
-using boost::timer::nanosecond_type;
 
 #define CMap_number 4
 extern string Map_name[Map_number];
@@ -109,7 +103,7 @@ public:
 
   void scheduler_init();
   void scheduler_thread();
-  boost::thread* scheduler_thread_ptr;
+  std::shared_ptr<std::thread> scheduler_thread_ptr;
   void scheduler_term();
   bool scheduler_terminate;
   bool scheduler_terminate_done;

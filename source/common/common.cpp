@@ -359,13 +359,6 @@ void remove_file(string filename)
             boost::filesystem::remove(file);
 }
 
-double get_seconds_count(cpu_timer& timer)
-{
-  boost::chrono::duration<double> seconds = boost::chrono::nanoseconds(timer.elapsed().wall);
-  return seconds.count();
-}
-
-
 double pow3(double x)
 {
   return x*x*x;

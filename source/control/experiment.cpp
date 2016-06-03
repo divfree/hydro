@@ -11,8 +11,6 @@ std::map<std::string, std::shared_ptr<ModuleFactory>> TExperiment::module_map_;
 
 string Map_name[Map_number]={"int", "double", "string", "bool", "vect"};
 
-double get_seconds_count(cpu_timer& timer);
-
 void TExperiment::status_change(ES new_status)
 {
   status=new_status;
