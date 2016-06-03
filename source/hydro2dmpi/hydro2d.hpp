@@ -49,6 +49,7 @@ template <class Mesh>
 class hydro : public TModule
 {
   static constexpr size_t dim = Mesh::dim;
+
   using Scal = typename Mesh::Scal;
   using MIdx = typename Mesh::MIdx;
   using Direction = typename Mesh::Direction;
@@ -66,11 +67,6 @@ class hydro : public TModule
   template <class T>
   using FieldNode = geom::FieldNode<T>;
 
- public:
-  hydro(TExperiment* _ex);
-  ~hydro() {}
-  void step();
-  void write_results(bool force=false);
   Mesh mesh;
   Mesh outmesh;
   FieldCell<IdxCell> out_to_mesh_;
@@ -119,6 +115,18 @@ class hydro : public TModule
   void InitRadiation();
   void InitHeatSolver();
   void InitOutput();
+  void CalcPhaseVolumeFraction();
+  std::vector<Scal> GetPhaseProperty(std::string name);
+  std::vector<Scal> GetPhaseProperty(std::string name,
+                                     const std::vector<bool>& v_enabled);
+  std::vector<bool> GetPhasePropertyFlag(std::string name);
+  void CalcPhaseVelocitySlip(const Vect& gravity);
+
+ public:
+  hydro(TExperiment* _ex);
+  ~hydro() {}
+  void step();
+  void write_results(bool force=false);
 };
 
 template <class Mesh>
@@ -343,9 +351,11 @@ void hydro<Mesh>::InitFluidSolver() {
 
 template <class Mesh>
 void hydro<Mesh>::InitAdvectionSolver() {
-  v_density.resize(num_phases);
-  v_viscosity.resize(num_phases);
-  v_conductivity.resize(num_phases);
+  // Properties of phases
+  v_density = GetPhaseProperty("density_");
+  v_viscosity = GetPhaseProperty("viscosity_");
+  v_conductivity = GetPhaseProperty("conductivity_");
+
   v_fc_mass_source.resize(num_phases);
   v_ff_volume_flux_slip.resize(num_phases);
   v_fc_volume_fraction.resize(num_phases);
@@ -353,13 +363,10 @@ void hydro<Mesh>::InitAdvectionSolver() {
   v_p_ff_volume_flux_slip.resize(num_phases);
   v_fc_density_target.resize(num_phases);
   v_fc_density.resize(num_phases);
+
   std::vector<FieldCell<Scal>> v_fc_partial_density_initial(num_phases);
 
-  // Properties of the phases
   for (auto i : phases) {
-    v_density[i] = P_double["density_" + IntToStr(i)];
-    v_viscosity[i] = P_double["viscosity_" + IntToStr(i)];
-    v_conductivity[i] = P_double["conductivity_" + IntToStr(i)];
     v_fc_mass_source[i].Reinit(mesh, 0.);
     v_fc_velocity_slip[i].Reinit(mesh);
     v_ff_volume_flux_slip[i].Reinit(mesh);
@@ -759,6 +766,119 @@ void Limit(Scal& source, Scal concentration, Scal density, Scal dt) {
   source = std::min(source, (1 - concentration) * density / dt);
 }
 
+template<class Mesh>
+void hydro<Mesh>::CalcPhaseVolumeFraction() {
+  // Calc and normalize volume fraction for phases
+  for (auto idxcell : mesh.Cells()) {
+    Scal sum = 0.;
+    for (auto i : phases) {
+      v_fc_volume_fraction[i][idxcell] = advection_solver->GetField(i)[idxcell]
+          / v_fc_density[i][idxcell];
+      v_fc_volume_fraction[i][idxcell] = std::max(
+          v_fc_volume_fraction[i][idxcell], 0.);
+      sum += v_fc_volume_fraction[i][idxcell];
+    }
+    for (auto i : phases) {
+      v_fc_volume_fraction[i][idxcell] /= sum;
+    }
+  }
+}
+
+template<class Mesh>
+auto hydro<Mesh>::GetPhaseProperty(std::string name) -> std::vector<Scal> {
+  std::vector<Scal> v_property(num_phases);
+  for (auto i : phases) {
+    v_property[i] = P_double[name + IntToStr(i)];
+  }
+  return v_property;
+}
+
+template<class Mesh>
+auto hydro<Mesh>::GetPhaseProperty(std::string name,
+                                   const std::vector<bool>& v_enabled)
+    -> std::vector<Scal> {
+  std::vector<Scal> v_property(num_phases, 0);
+  for (auto i : phases) {
+    if (v_enabled[i]) {
+      v_property[i] = P_double[name + IntToStr(i)];
+    }
+  }
+  return v_property;
+}
+
+template<class Mesh>
+auto hydro<Mesh>::GetPhasePropertyFlag(std::string name) -> std::vector<bool> {
+  std::vector<bool> v_property(num_phases);
+  for (auto i : phases) {
+    v_property[i] = flag(name + IntToStr(i));
+  }
+  return v_property;
+}
+
+// Velocity slip is phase velocity relative to mixture velocity
+template<class Mesh>
+void hydro<Mesh>::CalcPhaseVelocitySlip(const Vect& gravity) {
+  auto v_enable_settling = GetPhasePropertyFlag("enable_settling_");
+  auto v_bubble_radius = GetPhaseProperty("bubble_radius_", v_enable_settling);
+
+  for (auto idxcell : mesh.Cells()) {
+    // Calc phase velocities relative to carrier velocity
+    // using the Stokes law
+    std::vector<Vect> v_velocity_relative_to_carrier(num_phases, Vect::kZero);
+    for (auto i : phases) {
+      if (v_enable_settling[i]) {
+        Scal phase_c = v_fc_volume_fraction[i][idxcell];
+        Scal mixture_density = fc_density[idxcell];
+        Scal mixture_viscosity = fc_viscosity_smooth[idxcell];
+        Scal phase_density = v_density[i];
+        v_velocity_relative_to_carrier[i] =
+            phase_c < 0.01 || phase_c > 0.99 ?
+                Vect::kZero :
+                gravity * (phase_density - mixture_density) *
+                sqr(v_bubble_radius[i]) / (18. * mixture_viscosity);
+      }
+    }
+
+    // Calc carrier velocity relative to mixture velocity
+    Vect carrier_velocity_relative_to_mixture = Vect::kZero;
+    for (auto i : phases) {
+      carrier_velocity_relative_to_mixture +=
+          v_velocity_relative_to_carrier[i] *
+          v_fc_volume_fraction[i][idxcell];
+    }
+
+    // Calc phase velocities relative to mixture velocity
+    for (auto i : phases) {
+      v_fc_velocity_slip[i][idxcell] =
+          v_velocity_relative_to_carrier[i] -
+          carrier_velocity_relative_to_mixture;
+    }
+  }
+
+  // Calc velocity slip on faces
+  for (auto idxface : mesh.Faces()) {
+    if (mesh.IsInner(idxface)) {
+      Scal aver = 0.;
+      for (auto i : phases) {
+        v_ff_volume_flux_slip[i][idxface] =
+            solver::GetInterpolatedInner(
+                v_fc_velocity_slip[i], idxface, mesh).dot(
+                    mesh.GetSurface(idxface));
+        Scal c = solver::GetInterpolatedInner(
+            v_fc_volume_fraction[i], idxface, mesh);
+        aver += c * v_ff_volume_flux_slip[i][idxface];
+      }
+      for (auto i : phases) {
+        v_ff_volume_flux_slip[i][idxface] -= aver;
+      }
+    } else {
+      for (auto i : phases) {
+        v_ff_volume_flux_slip[i][idxface] = 0.;
+      }
+    }
+  }
+}
+
 template <class Mesh>
 void hydro<Mesh>::UpdateFluidProperties() {
   // Calc target density
@@ -786,27 +906,10 @@ void hydro<Mesh>::UpdateFluidProperties() {
     }
   }
 
-  // Calc and normalize volume fraction for phases
-  for (auto idxcell : mesh.Cells()) {
-    Scal sum = 0.;
-    for (auto i : phases) {
-      v_fc_volume_fraction[i][idxcell] =
-          advection_solver->GetField(i)[idxcell] / v_fc_density[i][idxcell];
-      v_fc_volume_fraction[i][idxcell] =
-          std::max(v_fc_volume_fraction[i][idxcell], 0.);
-      sum += v_fc_volume_fraction[i][idxcell];
-    }
-    for (auto i : phases) {
-      v_fc_volume_fraction[i][idxcell] /= sum;
-    }
-
-  }
+  CalcPhaseVolumeFraction();
 
   // Calc mass sources for phases
-  std::vector<Scal> v_molar_mass(num_phases);
-  for (auto i : phases) {
-    v_molar_mass[i] = P_double["molar_" + IntToStr(i)];
-  }
+  std::vector<Scal> v_molar_mass = GetPhaseProperty("molar_");
 
   std::shared_ptr<solver::Kinetics<Mesh>> chem_solver;
 
@@ -857,13 +960,13 @@ void hydro<Mesh>::UpdateFluidProperties() {
   }
 
   // Limit mass sources to prevent negative concentration values
-//  for (auto idxcell : mesh.Cells()) {
-//    for (auto i : phases) {
-//      Limit(v_fc_mass_source[i][idxcell],
-//            v_fc_volume_fraction[i][idxcell],
-//            v_density[i], Scal(fluid_solver->GetTimeStep()));
-//    }
-//  }
+  for (auto idxcell : mesh.Cells()) {
+    for (auto i : phases) {
+      Limit(v_fc_mass_source[i][idxcell],
+            v_fc_volume_fraction[i][idxcell],
+            v_density[i], Scal(fluid_solver->GetTimeStep()));
+    }
+  }
 
   // Calc mixture density, viscosity, gravity, sources
   fc_mass_source.Reinit(mesh, 0.);
@@ -914,61 +1017,10 @@ void hydro<Mesh>::UpdateFluidProperties() {
   fc_force = solver::GetSmoothField(fc_force, mesh,
                                     P_int["force_smooth_times"]);
 
-  // Calc velocity slip in cells to introduce settling
-  for (auto i : phases) {
-    if (flag("enable_settling_" + IntToStr(i))) {
-      // auto vel_slip = GetVect<Vect>(P_vect["slip_velocity_" + IntToStr(i)]);
-      auto bubble_radius = P_double["bubble_radius_" + IntToStr(i)];
-      Scal phase_density = v_density[i];
-      for (auto idxcell : mesh.Cells()) {
-        Scal c = v_fc_volume_fraction[i][idxcell];
-        Scal mixture_density = fc_density[idxcell];
-        Scal mixture_viscosity = fc_viscosity_smooth[idxcell];
-        v_fc_velocity_slip[i][idxcell] = c < 0.01 || c > 0.99 ? Vect::kZero :
-            gravity * (phase_density - mixture_density) * sqr(bubble_radius) /
-            (18. * mixture_viscosity);
-      }
-    } else {
-      v_fc_velocity_slip[i].Reinit(mesh, Vect::kZero);
-    }
-  }
-
-  // Calc the carrier velocity
-  for (auto idxcell : mesh.Cells()) {
-    Vect aver = Vect::kZero;
-    for (auto i : phases) {
-      aver += v_fc_velocity_slip[i][idxcell] *
-          v_fc_volume_fraction[i][idxcell];
-    }
-    for (auto i : phases) {
-      v_fc_velocity_slip[i][idxcell] -= aver;
-    }
-  }
+  // Calc velocity slip in cells and faces to introduce settling
+  CalcPhaseVelocitySlip(gravity);
 
   // TODO: Split templates into files
-
-  // Calc velocity slip on faces
-  for (auto idxface : mesh.Faces()) {
-    if (mesh.IsInner(idxface)) {
-      Scal aver = 0.;
-      for (auto i : phases) {
-        v_ff_volume_flux_slip[i][idxface] =
-            solver::GetInterpolatedInner(
-                v_fc_velocity_slip[i], idxface, mesh).dot(
-                    mesh.GetSurface(idxface));
-        Scal c = solver::GetInterpolatedInner(
-            v_fc_volume_fraction[i], idxface, mesh);
-        aver += c * v_ff_volume_flux_slip[i][idxface];
-      }
-      for (auto i : phases) {
-        v_ff_volume_flux_slip[i][idxface] -= aver;
-      }
-    } else {
-      for (auto i : phases) {
-        v_ff_volume_flux_slip[i][idxface] = 0.;
-      }
-    }
-  }
 
   if (double* factor = P_double("antidiffusion_factor")) {
     // Calc anti-diffusion terms
