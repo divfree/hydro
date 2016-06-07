@@ -1,0 +1,5 @@
+
+set int Nx 40
+set int Ny 10
+
+set double T 1
