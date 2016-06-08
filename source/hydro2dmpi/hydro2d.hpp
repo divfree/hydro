@@ -918,7 +918,7 @@ void hydro<Mesh>::CalcPhaseVelocitySlip() {
             advection_solver->GetField(i)[idxcell] /
             v_fc_true_density[i][idxcell];
       }
-      fc_volume_source[idxcell] = 0.*-volume_fraction_defect /
+      fc_volume_source[idxcell] = -volume_fraction_defect /
           fluid_solver->GetTimeStep();
     }
   }
