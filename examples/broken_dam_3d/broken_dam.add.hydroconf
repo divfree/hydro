@@ -1,0 +1,8 @@
+# mesh
+set int Nx 64
+set int Ny 20
+set int Nz 20
+
+# time
+set double T 0.1
+set double dt 0.005
