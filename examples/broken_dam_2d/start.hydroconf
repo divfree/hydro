@@ -9,7 +9,8 @@ ae exp1
 set string name exp
 
 run ../general.hydroconf
-run broken_dam.hydroconf
+run broken_dam_2d.hydroconf
+run broken_dam_2d.add.hydroconf
 
 init
 start

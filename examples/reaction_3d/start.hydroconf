@@ -9,8 +9,8 @@ ae exp1
 set string name exp
 
 run ../general.hydroconf
-run reaction.hydroconf
-run reaction.add.hydroconf
+run reaction_3d.hydroconf
+run reaction_3d.add.hydroconf
 
 init
 start
