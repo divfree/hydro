@@ -71,14 +71,11 @@ class ConvectionDiffusionImplicit : public ConvectionDiffusion<Mesh> {
   using VectGeneric = std::array<T, dim>;
   LayersData<geom::FieldCell<Vect>> fc_velocity_;
 
-  geom::MapFace<std::shared_ptr<ConditionFace>> mf_velocity_cond_shared_;
-  geom::MapCell<std::shared_ptr<ConditionCell>> mc_velocity_cond_shared_;
-  geom::MapFace<ConditionFace*> mf_velocity_cond_;
+  geom::MapFace<std::shared_ptr<ConditionFace>> mf_velocity_cond_;
+  geom::MapCell<std::shared_ptr<ConditionCell>> mc_velocity_cond_;
   geom::FieldCell<Vect>* p_fc_force_;
 
   VectGeneric<geom::MapFace<std::shared_ptr<ConditionFace>>>
-  v_mf_velocity_cond_shared_;
-  VectGeneric<geom::MapFace<ConditionFace*>>
   v_mf_velocity_cond_;
   // TODO: Extract scalar CellCondition
   VectGeneric<std::shared_ptr<Solver>>
@@ -97,9 +94,9 @@ class ConvectionDiffusionImplicit : public ConvectionDiffusion<Mesh> {
       const Mesh& mesh,
       const geom::FieldCell<Vect>& fc_velocity_initial,
       const geom::MapFace<std::shared_ptr<ConditionFace>>&
-      mf_velocity_cond_shared,
+      mf_velocity_cond,
       const geom::MapCell<std::shared_ptr<ConditionCell>>&
-      mc_velocity_cond_shared,
+      mc_velocity_cond,
       Scal relaxation_factor,
       geom::FieldCell<Scal>* p_fc_density,
       geom::FieldFace<Scal>* p_ff_kinematic_viscosity,
@@ -116,31 +113,30 @@ class ConvectionDiffusionImplicit : public ConvectionDiffusion<Mesh> {
           p_ff_vol_flux,
           convergence_tolerance, num_iterations_limit)
       , mesh(mesh)
-      , mf_velocity_cond_shared_(mf_velocity_cond_shared)
-      , mc_velocity_cond_shared_(mc_velocity_cond_shared)
+      , mf_velocity_cond_(mf_velocity_cond)
+      , mc_velocity_cond_(mc_velocity_cond)
       , p_fc_force_(p_fc_force)
   {
     for (size_t n = 0; n < dim; ++n) {
       // Boundary conditions for each velocity component
       // (copied from given vector conditions)
-      for (auto it = mf_velocity_cond_shared_.cbegin();
-          it != mf_velocity_cond_shared_.cend(); ++it) {
+      for (auto it = mf_velocity_cond_.cbegin();
+          it != mf_velocity_cond_.cend(); ++it) {
         IdxFace idxface = it->GetIdx();
         if (auto cond = dynamic_cast<ConditionFaceValue<Vect>*>(
-            mf_velocity_cond_shared_[idxface].get())) {
-          v_mf_velocity_cond_shared_[n][idxface] =
+            mf_velocity_cond_[idxface].get())) {
+          v_mf_velocity_cond_[n][idxface] =
               std::make_shared<ConditionFaceValueExtractComponent<Vect>>(
                   cond, n);
         } else {
           throw std::runtime_error("Unknown boudnary condition type");
         }
       }
-      v_mf_velocity_cond_[n] = GetPointers(v_mf_velocity_cond_shared_[n]);
 
       // Initialize solver
       v_solver_[n] = std::make_shared<Solver>(
           mesh, GetComponent(fc_velocity_initial, n),
-          v_mf_velocity_cond_shared_[n],
+          v_mf_velocity_cond_[n],
           geom::MapCell<std::shared_ptr<ConditionCell>>() /*empty*/,
           relaxation_factor, p_fc_density, p_ff_kinematic_viscosity,
           &(v_fc_force_[n]), p_ff_vol_flux, time, time_step,
@@ -427,32 +423,24 @@ class FluidSimple : public FluidSolver<Mesh> {
   geom::FieldCell<Scal> fc_kinematic_viscosity_;
   geom::FieldFace<Scal> ff_kinematic_viscosity_;
 
-  geom::MapFace<std::shared_ptr<ConditionFaceFluid>> mf_cond_shared_;
+  geom::MapFace<std::shared_ptr<ConditionFaceFluid>> mf_cond_;
 
-  geom::MapFace<std::shared_ptr<ConditionFace>> mf_velocity_cond_shared_;
+  geom::MapFace<std::shared_ptr<ConditionFace>> mf_velocity_cond_;
   // TODO: Const specifier for ConditionFace*
-  geom::MapFace<ConditionFace*> mf_velocity_cond_;
 
-  geom::MapFace<std::shared_ptr<ConditionFace>> mf_pressure_cond_shared_;
-  // TODO: Use only shared pointers for face conditions
-  //       (just pass them by const reference)
-  geom::MapFace<ConditionFace*> mf_pressure_cond_;
+  geom::MapFace<std::shared_ptr<ConditionFace>> mf_pressure_cond_;
 
-  geom::MapFace<std::shared_ptr<ConditionFace>> mf_pressure_grad_cond_shared_;
-  geom::MapFace<ConditionFace*> mf_pressure_grad_cond_;
+  geom::MapFace<std::shared_ptr<ConditionFace>> mf_pressure_grad_cond_;
 
-  geom::MapFace<std::shared_ptr<ConditionFace>> mf_force_cond_shared_;
-  geom::MapFace<ConditionFace*> mf_force_cond_;
+  geom::MapFace<std::shared_ptr<ConditionFace>> mf_force_cond_;
 
-  geom::MapFace<std::shared_ptr<ConditionFace>> mf_pressure_corr_cond_shared_;
-  geom::MapFace<ConditionFace*> mf_pressure_corr_cond_;
+  geom::MapFace<std::shared_ptr<ConditionFace>> mf_pressure_corr_cond_;
 
-  geom::MapFace<std::shared_ptr<ConditionFace>> mf_viscosity_cond_shared_;
-  geom::MapFace<ConditionFace*> mf_viscosity_cond_;
+  geom::MapFace<std::shared_ptr<ConditionFace>> mf_viscosity_cond_;
 
-  geom::MapCell<std::shared_ptr<ConditionCellFluid>> mc_cond_shared_;
-  geom::MapCell<std::shared_ptr<ConditionCell>> mc_pressure_cond_shared_;
-  geom::MapCell<std::shared_ptr<ConditionCell>> mc_velocity_cond_shared_;
+  geom::MapCell<std::shared_ptr<ConditionCellFluid>> mc_cond_;
+  geom::MapCell<std::shared_ptr<ConditionCell>> mc_pressure_cond_;
+  geom::MapCell<std::shared_ptr<ConditionCell>> mc_velocity_cond_;
 
   std::shared_ptr<LinearSolver<Scal, IdxCell, Expr>> linear_;
 
@@ -487,22 +475,22 @@ class FluidSimple : public FluidSolver<Mesh> {
   void UpdateDerivedConditions() {
     using namespace fluid_condition;
 
-    for (auto it = mf_cond_shared_.cbegin();
-        it != mf_cond_shared_.cend(); ++it) {
+    for (auto it = mf_cond_.cbegin();
+        it != mf_cond_.cend(); ++it) {
       IdxFace idxface = it->GetIdx();
       ConditionFaceFluid* cond_generic = it->GetValue().get();
 
       if (auto cond = dynamic_cast<NoSlipWall<Mesh>*>(cond_generic)) {
         *dynamic_cast<ConditionFaceValueFixed<Vect>*>(
-            mf_velocity_cond_[idxface]) =
+            mf_velocity_cond_[idxface].get()) =
             ConditionFaceValueFixed<Vect>(cond->GetVelocity());
       } else if (auto cond = dynamic_cast<Inlet<Mesh>*>(cond_generic)) {
         *dynamic_cast<ConditionFaceValueFixed<Vect>*>(
-            mf_velocity_cond_[idxface]) =
+            mf_velocity_cond_[idxface].get()) =
             ConditionFaceValueFixed<Vect>(cond->GetVelocity());
       } else if (auto cond = dynamic_cast<Outlet<Mesh>*>(cond_generic)) {
         *dynamic_cast<ConditionFaceValueFixed<Vect>*>(
-            mf_velocity_cond_[idxface]) =
+            mf_velocity_cond_[idxface].get()) =
             ConditionFaceValueFixed<Vect>(cond->GetVelocity());
       } else {
         throw std::runtime_error("Unknown fluid condition");
@@ -510,22 +498,22 @@ class FluidSimple : public FluidSolver<Mesh> {
     }
 
 
-    for (auto it = mc_cond_shared_.cbegin();
-        it != mc_cond_shared_.cend(); ++it) {
+    for (auto it = mc_cond_.cbegin();
+        it != mc_cond_.cend(); ++it) {
       IdxCell idxcell = it->GetIdx();
       ConditionCellFluid* cond_generic = it->GetValue().get();
 
       if (auto cond = dynamic_cast<GivenPressure<Mesh>*>(cond_generic)) {
         *dynamic_cast<ConditionCellValueFixed<Scal>*>(
-            mc_pressure_cond_shared_[idxcell].get()) =
+            mc_pressure_cond_[idxcell].get()) =
                 ConditionCellValueFixed<Scal>(cond->GetPressure());
       } else if (auto cond =
           dynamic_cast<GivenVelocityAndPressure<Mesh>*>(cond_generic)) {
         *dynamic_cast<ConditionCellValueFixed<Vect>*>(
-            mc_velocity_cond_shared_[idxcell].get()) =
+            mc_velocity_cond_[idxcell].get()) =
                 ConditionCellValueFixed<Vect>(cond->GetVelocity());
         *dynamic_cast<ConditionCellValueFixed<Scal>*>(
-            mc_pressure_cond_shared_[idxcell].get()) =
+            mc_pressure_cond_[idxcell].get()) =
                 ConditionCellValueFixed<Scal>(cond->GetPressure());
       } else {
         throw std::runtime_error("Unknown fluid cell condition");
@@ -540,8 +528,8 @@ class FluidSimple : public FluidSolver<Mesh> {
     Scal inlet_volume_flux = 0.;   // Both should be positive
     Scal outlet_volume_flux = 0.;
     Scal outlet_area = 0.;
-    for (auto it = mf_cond_shared_.cbegin();
-        it != mf_cond_shared_.cend(); ++it) {
+    for (auto it = mf_cond_.cbegin();
+        it != mf_cond_.cend(); ++it) {
       IdxFace idxface = it->GetIdx();
       ConditionFaceFluid* cond_generic = it->GetValue().get();
 
@@ -575,8 +563,8 @@ class FluidSimple : public FluidSolver<Mesh> {
         (inlet_volume_flux - outlet_volume_flux) / outlet_area;
 
     // Apply correction on outlet faces
-    for (auto it = mf_cond_shared_.cbegin();
-        it != mf_cond_shared_.cend(); ++it) {
+    for (auto it = mf_cond_.cbegin();
+        it != mf_cond_.cend(); ++it) {
       IdxFace idxface = it->GetIdx();
       ConditionFaceFluid* cond_generic = it->GetValue().get();
 
@@ -597,9 +585,9 @@ class FluidSimple : public FluidSolver<Mesh> {
   FluidSimple(const Mesh& mesh,
               const geom::FieldCell<Vect>& fc_velocity_initial,
               const geom::MapFace<std::shared_ptr<ConditionFaceFluid>>&
-              mf_cond_shared,
+              mf_cond,
               const geom::MapCell<std::shared_ptr<ConditionCellFluid>>&
-              mc_cond_shared,
+              mc_cond,
               Scal velocity_relaxation_factor,
               Scal pressure_relaxation_factor,
               Scal rhie_chow_factor,
@@ -626,8 +614,8 @@ class FluidSimple : public FluidSolver<Mesh> {
       , velocity_relaxation_factor_(velocity_relaxation_factor)
       , pressure_relaxation_factor_(pressure_relaxation_factor)
       , rhie_chow_factor_(rhie_chow_factor)
-      , mf_cond_shared_(mf_cond_shared)
-      , mc_cond_shared_(mc_cond_shared)
+      , mf_cond_(mf_cond)
+      , mc_cond_(mc_cond)
       , ff_volume_flux_corr_(mesh)
       , fc_pressure_corr_system_(mesh)
       , timer_(timer)
@@ -641,66 +629,59 @@ class FluidSimple : public FluidSolver<Mesh> {
     using namespace fluid_condition;
 
     is_boundary_.Reinit(mesh, false);
-    for (auto it = mf_cond_shared_.cbegin();
-        it != mf_cond_shared_.cend(); ++it) {
+    for (auto it = mf_cond_.cbegin();
+        it != mf_cond_.cend(); ++it) {
       IdxFace idxface = it->GetIdx();
       is_boundary_[idxface] = true;
       ConditionFaceFluid* cond_generic = it->GetValue().get();
 
       if (auto cond = dynamic_cast<NoSlipWall<Mesh>*>(cond_generic)) {
-        mf_velocity_cond_shared_[idxface] =
+        mf_velocity_cond_[idxface] =
             std::make_shared<
             ConditionFaceValueFixed<Vect>>(cond->GetVelocity());
-        mf_pressure_cond_shared_[idxface] =
+        mf_pressure_cond_[idxface] =
             std::make_shared<ConditionFaceExtrapolation>();
       } else if (auto cond = dynamic_cast<Inlet<Mesh>*>(cond_generic)) {
-        mf_velocity_cond_shared_[idxface] =
+        mf_velocity_cond_[idxface] =
             std::make_shared<
             ConditionFaceValueFixed<Vect>>(cond->GetVelocity());
-        mf_pressure_cond_shared_[idxface] =
+        mf_pressure_cond_[idxface] =
             std::make_shared<ConditionFaceExtrapolation>();
       } else if (auto cond = dynamic_cast<Outlet<Mesh>*>(cond_generic)) {
-        mf_velocity_cond_shared_[idxface] =
+        mf_velocity_cond_[idxface] =
             std::make_shared<
             ConditionFaceValueFixed<Vect>>(cond->GetVelocity());
-        mf_pressure_cond_shared_[idxface] =
+        mf_pressure_cond_[idxface] =
             std::make_shared<ConditionFaceExtrapolation>();
       } else {
         throw std::runtime_error("Unknown fluid condition");
       }
 
-      mf_pressure_grad_cond_shared_[idxface] =
+      mf_pressure_grad_cond_[idxface] =
           std::make_shared<ConditionFaceDerivativeFixed<Vect>>(Vect::kZero);
-      mf_force_cond_shared_[idxface] =
+      mf_force_cond_[idxface] =
           std::make_shared<ConditionFaceDerivativeFixed<Vect>>(Vect::kZero);
-      mf_pressure_corr_cond_shared_[idxface] =
+      mf_pressure_corr_cond_[idxface] =
           std::make_shared<ConditionFaceExtrapolation>();
-      mf_viscosity_cond_shared_[idxface] =
+      mf_viscosity_cond_[idxface] =
           std::make_shared<ConditionFaceDerivativeFixed<Scal>>(0.);
     }
 
-    mf_velocity_cond_ = GetPointers(mf_velocity_cond_shared_);
-    mf_pressure_cond_ = GetPointers(mf_pressure_cond_shared_);
-    mf_pressure_grad_cond_ = GetPointers(mf_pressure_grad_cond_shared_);
-    mf_force_cond_ = GetPointers(mf_force_cond_shared_);
-    mf_pressure_corr_cond_ = GetPointers(mf_pressure_corr_cond_shared_);
-    mf_viscosity_cond_ = GetPointers(mf_viscosity_cond_shared_);
-
-    for (auto it = mc_cond_shared_.cbegin();
-        it != mc_cond_shared_.cend(); ++it) {
+    for (auto it = mc_cond_.cbegin();
+        it != mc_cond_.cend(); ++it) {
       IdxCell idxcell = it->GetIdx();
       ConditionCellFluid* cond_generic = it->GetValue().get();
 
       if (auto cond = dynamic_cast<GivenPressure<Mesh>*>(cond_generic)) {
-        mc_pressure_cond_shared_[idxcell] =
+        mc_pressure_cond_[idxcell] =
             std::make_shared<
             ConditionCellValueFixed<Scal>>(cond->GetPressure());
       } else if (auto cond =
           dynamic_cast<GivenVelocityAndPressure<Mesh>*>(cond_generic)) {
-        mc_pressure_cond_shared_[idxcell] =
+        mc_pressure_cond_[idxcell] =
             std::make_shared<
             ConditionCellValueFixed<Scal>>(cond->GetPressure());
-        mc_velocity_cond_shared_[idxcell] =
+        mc_velocity_cond_[idxcell] =
             std::make_shared<
             ConditionCellValueFixed<Vect>>(cond->GetVelocity());
       } else {
@@ -711,7 +692,7 @@ class FluidSimple : public FluidSolver<Mesh> {
     conv_diff_solver_ = std::make_shared<
         ConvectionDiffusionImplicit<Mesh>>(
             mesh, fc_velocity_initial,
-            mf_velocity_cond_shared_, mc_velocity_cond_shared_,
+            mf_velocity_cond_, mc_velocity_cond_,
             velocity_relaxation_factor_,
             p_fc_density, &ff_kinematic_viscosity_, &fc_force_,
             &ff_vol_flux_.iter_prev,
@@ -843,7 +824,7 @@ class FluidSimple : public FluidSolver<Mesh> {
 
     // Define ff_diag_coeff_ on inner faces only
     ff_diag_coeff_ = Interpolate(
-        fc_diag_coeff_, geom::MapFace<ConditionFace*>(), mesh);
+        fc_diag_coeff_, geom::MapFace<std::shared_ptr<ConditionFace>>(), mesh);
 
     fc_velocity_asterisk_ = conv_diff_solver_->GetVelocity(Layers::iter_curr);
 
@@ -940,8 +921,8 @@ class FluidSimple : public FluidSolver<Mesh> {
     }
 
     // Account for cell conditions for pressure
-    for (auto it = mc_pressure_cond_shared_.cbegin();
-        it != mc_pressure_cond_shared_.cend(); ++it) {
+    for (auto it = mc_pressure_cond_.cbegin();
+        it != mc_pressure_cond_.cend(); ++it) {
       IdxCell idxcell(it->GetIdx());
       ConditionCell* cond = it->GetValue().get();
       if (auto cond_value = dynamic_cast<ConditionCellValue<Scal>*>(cond)) {
@@ -1039,7 +1020,7 @@ class FluidSimple : public FluidSolver<Mesh> {
       }
 
       auto ff_evaluated = Interpolate(
-          fc_evaluated, geom::MapFace<ConditionFace*>(), mesh);
+          fc_evaluated, geom::MapFace<std::shared_ptr<ConditionFace>>(), mesh);
 
       geom::FieldFace<Scal> ff_rhs(mesh, 0);
 #pragma omp parallel for
@@ -1067,8 +1048,8 @@ class FluidSimple : public FluidSolver<Mesh> {
       }
 
       // Account for cell conditions for pressure
-      for (auto it = mc_pressure_cond_shared_.cbegin();
-          it != mc_pressure_cond_shared_.cend(); ++it) {
+      for (auto it = mc_pressure_cond_.cbegin();
+          it != mc_pressure_cond_.cend(); ++it) {
         IdxCell idxcell(it->GetIdx());
         ConditionCell* cond = it->GetValue().get();
         if (auto cond_value = dynamic_cast<ConditionCellValue<Scal>*>(cond)) {
@@ -1161,8 +1142,8 @@ class FluidSimpleParallel : public FluidSolver<Mesh> {
   template <class T>
   using MapCell = geom::MapCell<T>;
 
-  MapFace<std::shared_ptr<ConditionFaceFluid>> mf_cond_shared_;
-  MapCell<std::shared_ptr<ConditionCellFluid>> mc_cond_shared_;
+  MapFace<std::shared_ptr<ConditionFaceFluid>> mf_cond_;
+  MapCell<std::shared_ptr<ConditionCellFluid>> mc_cond_;
   Scal velocity_relaxation_factor_;
   Scal pressure_relaxation_factor_;
   LayersData<FieldFace<Scal>> ff_vol_flux_;
@@ -1177,8 +1158,8 @@ class FluidSimpleParallel : public FluidSolver<Mesh> {
     FieldFace<IdxFace> ff_global;
     FieldFace<bool> ff_active;
     std::shared_ptr<FluidSolver<Mesh>> fluid_solver;
-    MapFace<std::shared_ptr<ConditionFaceFluid>> mf_cond_shared;
-    MapCell<std::shared_ptr<ConditionCellFluid>> mc_cond_shared;
+    MapFace<std::shared_ptr<ConditionFaceFluid>> mf_cond;
+    MapCell<std::shared_ptr<ConditionCellFluid>> mc_cond;
     FieldCell<Scal> fc_density;
     FieldCell<Scal> fc_viscosity;
     FieldCell<Vect> fc_force;
@@ -1352,8 +1333,8 @@ class FluidSimpleParallel : public FluidSolver<Mesh> {
     IdxCell idxcell_pressure_fixed(0);
 
     for (auto& local : local_) {
-      for (auto it = local.mc_cond_shared.begin();
-          it != local.mc_cond_shared.end(); ++it) {
+      for (auto it = local.mc_cond.begin();
+          it != local.mc_cond.end(); ++it) {
         auto idxcell = it->GetIdx();
         auto cond = it->GetValue().get();
         if (auto cond_ref =
@@ -1365,8 +1346,8 @@ class FluidSimpleParallel : public FluidSolver<Mesh> {
         }
       }
 
-      for (auto it = local.mf_cond_shared.begin();
-          it != local.mf_cond_shared.end(); ++it) {
+      for (auto it = local.mf_cond.begin();
+          it != local.mf_cond.end(); ++it) {
         auto idxface = it->GetIdx();
         auto cond = it->GetValue().get();
         if (auto cond_wall =
@@ -1385,9 +1366,9 @@ class FluidSimpleParallel : public FluidSolver<Mesh> {
         const Mesh& mesh
       , const geom::FieldCell<Vect>& fc_velocity_initial
       , const geom::MapFace<std::shared_ptr<ConditionFaceFluid>>&
-        mf_cond_shared
+        mf_cond
       , const geom::MapCell<std::shared_ptr<ConditionCellFluid>>&
-        mc_cond_shared
+        mc_cond
       , Scal velocity_relaxation_factor
       , Scal pressure_relaxation_factor
       , geom::FieldCell<Scal>* p_fc_density
@@ -1408,8 +1389,8 @@ class FluidSimpleParallel : public FluidSolver<Mesh> {
                     p_fc_force, p_fc_volume_source, p_fc_mass_source,
                     convergence_tolerance, num_iterations_limit)
       , global_mesh(mesh)
-      , mf_cond_shared_(mf_cond_shared)
-      , mc_cond_shared_(mc_cond_shared)
+      , mf_cond_(mf_cond)
+      , mc_cond_(mc_cond)
       , velocity_relaxation_factor_(velocity_relaxation_factor)
       , pressure_relaxation_factor_(pressure_relaxation_factor)
       , timer_(timer)
@@ -1432,37 +1413,37 @@ class FluidSimpleParallel : public FluidSolver<Mesh> {
       CopyToLocal(fc_velocity_initial, local_velocity_initial, local);
 
       for (IdxFace idxface : local.mesh.Faces()) {
-        if (auto ptr = mf_cond_shared_.find(local.ff_global[idxface])) {
-          local.mf_cond_shared[idxface] = *ptr;
+        if (auto ptr = mf_cond_.find(local.ff_global[idxface])) {
+          local.mf_cond[idxface] = *ptr;
         } else if (!local.mesh.IsInner(idxface)) {
-          local.mf_cond_shared[idxface] =
+          local.mf_cond[idxface] =
               std::make_shared<ConditionFaceReferenceToGlobal>(Vect(0., 0.));
 //          auto idxcell = local.mesh.GetNeighbourCell(
 //              idxface, local.mesh.GetValidNeighbourCellId(idxface));
-//          local.mc_cond_shared[idxcell] =
+//          local.mc_cond[idxcell] =
 //              std::make_shared<ConditionCellReferenceToGlobal>(
 //                  Vect(0., 0.), 0.);
         }
 
         // Add fixed pressure condition
-        local.mc_cond_shared[IdxCell(0)] =
+        local.mc_cond[IdxCell(0)] =
             std::make_shared<solver::fluid_condition::
             GivenPressureFixed<Mesh>>(0.);
       }
 
       for (IdxCell idxcell : local.mesh.Cells()) {
-        if (auto ptr = mc_cond_shared_.find(local.fc_global[idxcell])) {
-          local.mc_cond_shared[idxcell] = *ptr;
+        if (auto ptr = mc_cond_.find(local.fc_global[idxcell])) {
+          local.mc_cond[idxcell] = *ptr;
         }
       }
 
-      std::cout << "set " << local.mf_cond_shared.size() << " conditions"
+      std::cout << "set " << local.mf_cond.size() << " conditions"
           << std::endl;
 
       local.fluid_solver =
           std::make_shared<solver::FluidSimple<Mesh>>(
           local.mesh, local_velocity_initial,
-          local.mf_cond_shared, local.mc_cond_shared,
+          local.mf_cond, local.mc_cond,
           velocity_relaxation_factor,
           pressure_relaxation_factor,
           &local.fc_density, &local.fc_viscosity, &local.fc_force,

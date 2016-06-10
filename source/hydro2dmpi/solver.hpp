@@ -248,11 +248,11 @@ class InterpolationBoundaryFaceNearestCell:
     public Approximation<Mesh, IdxFace, Expr> {
   using Scal = typename Mesh::Scal;
   using Vect = typename Mesh::Vect;
-  const geom::MapFace<ConditionFace*>& mf_cond_;
+  const geom::MapFace<std::shared_ptr<ConditionFace>>& mf_cond_;
  public:
   InterpolationBoundaryFaceNearestCell(
       const Mesh& mesh,
-      const geom::MapFace<ConditionFace*>& mf_cond)
+      const geom::MapFace<std::shared_ptr<ConditionFace>>& mf_cond)
       : Approximation<Mesh, IdxFace, Expr>(mesh)
       , mf_cond_(mf_cond)
   {}
@@ -261,10 +261,10 @@ class InterpolationBoundaryFaceNearestCell:
     Expr expr;
     if (auto cond_generic = mf_cond_.find(idxface)) {
       if (auto cond_value =
-          dynamic_cast<ConditionFaceValue<Scal>*>(*cond_generic)) {
+          dynamic_cast<ConditionFaceValue<Scal>*>(cond_generic->get())) {
         expr.SetConstant(cond_value->GetValue());
       } else if (auto cond_derivative =
-          dynamic_cast<ConditionFaceDerivative<Scal>*>(*cond_generic)) {
+          dynamic_cast<ConditionFaceDerivative<Scal>*>(cond_generic->get())) {
         size_t id = mesh.GetValidNeighbourCellId(idxface);
         IdxCell cc = mesh.GetNeighbourCell(idxface, id);
         Scal factor = (id == 0 ? 1. : -1.);
@@ -310,11 +310,11 @@ class DerivativeBoundaryFacePlain:
     public Approximation<Mesh, IdxFace, Expr> {
   using Scal = typename Mesh::Scal;
   using Vect = typename Mesh::Vect;
-  const geom::MapFace<ConditionFace*>& mf_cond_;
+  const geom::MapFace<std::shared_ptr<ConditionFace>>& mf_cond_;
  public:
   explicit DerivativeBoundaryFacePlain(
       const Mesh& mesh,
-      const geom::MapFace<ConditionFace*>& mf_cond)
+      const geom::MapFace<std::shared_ptr<ConditionFace>>& mf_cond)
       : Approximation<Mesh, IdxFace, Expr>(mesh)
       , mf_cond_(mf_cond)
   {}
@@ -323,10 +323,10 @@ class DerivativeBoundaryFacePlain:
     Expr expr;
     if (auto cond_generic = mf_cond_.find(idxface)) {
       if (auto cond_derivative =
-          dynamic_cast<ConditionFaceDerivative<Scal>*>(*cond_generic)) {
+          dynamic_cast<ConditionFaceDerivative<Scal>*>(cond_generic->get())) {
         expr.SetConstant(cond_derivative->GetDerivative());
       } else if (auto cond_value =
-          dynamic_cast<ConditionFaceValue<Scal>*>(*cond_generic)) {
+          dynamic_cast<ConditionFaceValue<Scal>*>(cond_generic->get())) {
         size_t id = mesh.GetValidNeighbourCellId(idxface);
         IdxCell cc = mesh.GetNeighbourCell(idxface, id);
         Scal factor = (id == 0 ? 1. : -1.);
@@ -394,9 +394,10 @@ geom::Vect<Scal, dim> GetGeometricAverage(const geom::Vect<Scal, dim>& a,
 }
 
 template <class T, class Mesh>
-geom::FieldFace<T> Interpolate(const geom::FieldCell<T>& fc_u,
-                               const geom::MapFace<ConditionFace*>& mf_cond_u,
-                               const Mesh& mesh, bool geometric = false) {
+geom::FieldFace<T> Interpolate(
+    const geom::FieldCell<T>& fc_u,
+    const geom::MapFace<std::shared_ptr<ConditionFace>>& mf_cond_u,
+    const Mesh& mesh, bool geometric = false) {
   using Scal = typename Mesh::Scal;
   using Vect = typename Mesh::Vect;
   using IdxCell = geom::IdxCell;
@@ -432,7 +433,7 @@ geom::FieldFace<T> Interpolate(const geom::FieldCell<T>& fc_u,
 
   for (auto it = mf_cond_u.cbegin(); it != mf_cond_u.cend(); ++it) {
     IdxFace idxface = it->GetIdx();
-    ConditionFace* cond = it->GetValue();
+    ConditionFace* cond = it->GetValue().get();
     if (auto cond_value = dynamic_cast<ConditionFaceValue<T>*>(cond)) {
       res[idxface] = cond_value->GetValue();
     } else if (auto cond_derivative =
@@ -500,7 +501,7 @@ CalcLaplacian(const geom::FieldCell<typename Mesh::Scal>& fc_u,
 template <class T, class Mesh>
 geom::FieldFace<T> InterpolateFirstUpwind(
     const geom::FieldCell<T>& fc_u,
-    const geom::MapFace<ConditionFace*>& mf_cond_u,
+    const geom::MapFace<std::shared_ptr<ConditionFace>>& mf_cond_u,
     const geom::FieldFace<typename Mesh::Scal>& probe,
     const Mesh& mesh, typename Mesh::Scal threshold = 1e-8) {
   using Scal = typename Mesh::Scal;
@@ -527,7 +528,7 @@ geom::FieldFace<T> InterpolateFirstUpwind(
 
   for (auto it = mf_cond_u.cbegin(); it != mf_cond_u.cend(); ++it) {
     IdxFace idxface = it->GetIdx();
-    ConditionFace* cond = it->GetValue();
+    ConditionFace* cond = it->GetValue().get();
     if (auto cond_value = dynamic_cast<ConditionFaceValue<T>*>(cond)) {
       res[idxface] = cond_value->GetValue();
     } else if (auto cond_derivative =
@@ -561,7 +562,7 @@ geom::FieldFace<typename Mesh::Scal>
 InterpolateSuperbee(
     const geom::FieldCell<typename Mesh::Scal>& fc_u,
     const geom::FieldCell<typename Mesh::Vect>& fc_u_grad,
-    const geom::MapFace<ConditionFace*>& mf_cond_u,
+    const geom::MapFace<std::shared_ptr<ConditionFace>>& mf_cond_u,
     const geom::FieldFace<typename Mesh::Scal>& probe,
     const Mesh& mesh, typename Mesh::Scal threshold = 1e-8) {
   using Scal = typename Mesh::Scal;
@@ -596,7 +597,7 @@ InterpolateSuperbee(
   // TODO: Move interpolation on boundaries to a function
   for (auto it = mf_cond_u.cbegin(); it != mf_cond_u.cend(); ++it) {
     IdxFace idxface = it->GetIdx();
-    ConditionFace* cond = it->GetValue();
+    ConditionFace* cond = it->GetValue().get();
     if (auto cond_value = dynamic_cast<ConditionFaceValue<Scal>*>(cond)) {
       res[idxface] = cond_value->GetValue();
     } else if (auto cond_derivative =
@@ -634,16 +635,14 @@ template <class T, class Mesh>
 geom::FieldCell<T>
 GetSmoothField(const geom::FieldCell<T>& fc_u,
             const Mesh& mesh, size_t repeat = 1) {
-  geom::MapFace<std::shared_ptr<ConditionFace>> mf_cond_shared;
-  geom::MapFace<ConditionFace*> mf_cond;
+  geom::MapFace<std::shared_ptr<ConditionFace>> mf_cond;
 
   for (auto idxface : mesh.Faces()) {
     if (!mesh.IsExcluded(idxface) && !mesh.IsInner(idxface)) {
-      mf_cond_shared[idxface] =
+      mf_cond[idxface] =
           std::make_shared<ConditionFaceDerivativeFixed<T>>(T(0));
     }
   }
-  mf_cond = GetPointers(mf_cond_shared);
 
   geom::FieldCell<T> res = fc_u;
 

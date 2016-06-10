@@ -66,9 +66,8 @@ class ConvectionDiffusionScalarImplicit :
   using IdxFace = geom::IdxFace;
   using Expr = Expression<Scal, IdxCell, 1 + dim * 2>;
 
-  geom::MapFace<std::shared_ptr<ConditionFace>> mf_cond_shared_;
-  geom::MapCell<std::shared_ptr<ConditionCell>> mc_cond_shared_;
-  geom::MapFace<ConditionFace*> mf_cond_;
+  geom::MapFace<std::shared_ptr<ConditionFace>> mf_cond_;
+  geom::MapCell<std::shared_ptr<ConditionCell>> mc_cond_;
   std::shared_ptr<LinearSolver<Scal, IdxCell, Expr>> linear_;
   Scal relaxation_factor_;
   bool time_second_order_;
@@ -85,9 +84,9 @@ class ConvectionDiffusionScalarImplicit :
       const Mesh& mesh,
       const geom::FieldCell<Scal>& fc_initial,
       const geom::MapFace<std::shared_ptr<ConditionFace>>&
-      mf_cond_shared,
+      mf_cond,
       const geom::MapCell<std::shared_ptr<ConditionCell>>&
-      mc_cond_shared,
+      mc_cond,
       Scal relaxation_factor,
       const geom::FieldCell<Scal>* p_fc_scaling,
       const geom::FieldFace<Scal>* p_ff_diffusion_rate,
@@ -104,16 +103,14 @@ class ConvectionDiffusionScalarImplicit :
           p_ff_vol_flux,
           convergence_tolerance, num_iterations_limit)
       , mesh(mesh)
-      , mf_cond_shared_(mf_cond_shared)
-      , mc_cond_shared_(mc_cond_shared)
+      , mf_cond_(mf_cond)
+      , mc_cond_(mc_cond)
       , relaxation_factor_(relaxation_factor)
       , time_second_order_(time_second_order)
       , guess_extrapolation_(guess_extrapolation)
   {
     fc_field_.time_curr = fc_initial;
     fc_field_.time_prev = fc_field_.time_curr;
-
-    mf_cond_ = GetPointers(mf_cond_shared_);
 
     linear_ = linear_factory.Create<Scal, IdxCell, Expr>();
   }
@@ -209,8 +206,8 @@ class ConvectionDiffusionScalarImplicit :
     }
 
     // Account for cell conditions for velocity
-    for (auto it = mc_cond_shared_.cbegin();
-        it != mc_cond_shared_.cend(); ++it) {
+    for (auto it = mc_cond_.cbegin();
+        it != mc_cond_.cend(); ++it) {
       IdxCell idxcell(it->GetIdx());
       ConditionCell* cond = it->GetValue().get();
       auto& eqn = fc_system_[idxcell];

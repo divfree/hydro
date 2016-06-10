@@ -118,8 +118,7 @@ class AdvectionSolverImplicit :
   using IdxFace = geom::IdxFace;
   using IdxNode = geom::IdxNode;
   using Expr = Expression<Scal, IdxCell, 1 + dim * 2>;
-  geom::MapFace<std::shared_ptr<ConditionFace>> mf_u_cond_shared_;
-  geom::MapFace<ConditionFace*> mf_u_cond_;
+  geom::MapFace<std::shared_ptr<ConditionFace>> mf_u_cond_;
   std::shared_ptr<LinearSolver<Scal, IdxCell, Expr>> linear_;
   // Common buffers:
   geom::FieldFace<Vect> ff_velocity_;
@@ -133,7 +132,7 @@ class AdvectionSolverImplicit :
   AdvectionSolverImplicit(
       const Mesh& mesh,
       const geom::FieldCell<Scal>& fc_u_initial,
-      const geom::MapFace<std::shared_ptr<ConditionFace>>& mf_u_cond_shared,
+      const geom::MapFace<std::shared_ptr<ConditionFace>>& mf_u_cond,
       const VelocityField* p_fn_velocity,
       const geom::FieldCell<Scal>* p_fc_source,
       double time, double time_step,
@@ -142,7 +141,7 @@ class AdvectionSolverImplicit :
       : AdvectionSolver<Mesh, VelocityField>(
           time, time_step, p_fn_velocity, p_fc_source)
       , mesh(mesh)
-      , mf_u_cond_shared_(mf_u_cond_shared)
+      , mf_u_cond_(mf_u_cond)
       , ff_volume_flux_(mesh)
       , ff_flux_(mesh)
       , fc_flux_sum_(mesh)
@@ -154,8 +153,8 @@ class AdvectionSolverImplicit :
 
     linear_ = linear_factory.Create<Scal, IdxCell, Expr>();
 
-    for (auto it = mf_u_cond_shared_.cbegin() ;
-        it != mf_u_cond_shared_.cend();
+    for (auto it = mf_u_cond_.cbegin() ;
+        it != mf_u_cond_.cend();
         ++it) {
         mf_u_cond_[it->GetIdx()] = it->GetValue().get();
     }
@@ -272,8 +271,7 @@ class AdvectionSolverExplicit :
   using IdxFace = geom::IdxFace;
   using IdxNode = geom::IdxNode;
   using Expr = Expression<Scal, IdxCell, 1 + dim * 2>;
-  geom::MapFace<std::shared_ptr<ConditionFace>> mf_u_cond_shared_;
-  geom::MapFace<ConditionFace*> mf_u_cond_;
+  geom::MapFace<std::shared_ptr<ConditionFace>> mf_u_cond_;
   // Common buffers:
   geom::FieldFace<Vect> ff_velocity_;
   geom::FieldFace<Scal> ff_volume_flux_;
@@ -284,20 +282,18 @@ class AdvectionSolverExplicit :
   AdvectionSolverExplicit(
       const Mesh& mesh,
       const geom::FieldCell<Scal>& fc_u_initial,
-      const geom::MapFace<std::shared_ptr<ConditionFace>>& mf_u_cond_shared,
+      const geom::MapFace<std::shared_ptr<ConditionFace>>& mf_u_cond_,
       const VelocityField* p_fn_velocity,
       const geom::FieldCell<Scal>* p_fc_source,
       double time, double time_step)
       : AdvectionSolver<Mesh, VelocityField>(
           time, time_step, p_fn_velocity, p_fc_source)
       , mesh(mesh)
-      , mf_u_cond_shared_(mf_u_cond_shared)
+      , mf_u_cond_(mf_u_cond_)
       , ff_volume_flux_(mesh)
       , ff_flux_(mesh)
   {
     fc_u_.time_curr = fc_u_initial;
-
-    mf_u_cond_ = GetPointers(mf_u_cond_shared_);
   }
   void StartStep() override {
     this->ClearIterationCount();
@@ -380,10 +376,7 @@ class AdvectionSolverMultiExplicit :
   using IdxFace = geom::IdxFace;
   using IdxNode = geom::IdxNode;
   using Expr = Expression<Scal, IdxCell, 1 + dim * 2>;
-  std::vector<geom::MapFace<std::shared_ptr<ConditionFace>>>
-  v_mf_u_cond_shared_;
-  std::vector<geom::MapFace<ConditionFace*>>
-  v_mf_u_cond_;
+  std::vector<geom::MapFace<std::shared_ptr<ConditionFace>>> v_mf_u_cond_;
   std::vector<const VelocityField*> v_p_ff_volume_flux_slip_;
   bool spatial_split_;
   // Common buffers:
@@ -394,7 +387,7 @@ class AdvectionSolverMultiExplicit :
       const Mesh& mesh,
       const std::vector<geom::FieldCell<Scal>>& v_fc_u_initial,
       const std::vector<geom::MapFace<std::shared_ptr<ConditionFace>>>&
-      v_mf_u_cond_shared,
+      v_mf_u_cond,
       const VelocityField* p_fn_velocity,
       const std::vector<const VelocityField*>& v_p_ff_volume_flux_slip,
       const std::vector<const geom::FieldCell<Scal>*>& v_p_fc_source,
@@ -404,7 +397,7 @@ class AdvectionSolverMultiExplicit :
           time, time_step, p_fn_velocity, v_p_fc_source)
       , mesh(mesh)
       , num_fields_(v_fc_u_initial.size())
-      , v_mf_u_cond_shared_(v_mf_u_cond_shared)
+      , v_mf_u_cond_(v_mf_u_cond)
       , v_p_ff_volume_flux_slip_(v_p_ff_volume_flux_slip)
       , spatial_split_(spatial_split)
   {
@@ -412,7 +405,6 @@ class AdvectionSolverMultiExplicit :
     v_mf_u_cond_.resize(num_fields_);
     for (size_t field = 0; field < num_fields_; ++field) {
       v_fc_u_[field].time_curr = v_fc_u_initial[field];
-      v_mf_u_cond_[field] = GetPointers(v_mf_u_cond_shared_[field]);
     }
   }
   void StartStep() override {
@@ -514,24 +506,24 @@ class AdvectionSolverParticles :
   using IdxFace = geom::IdxFace;
   using IdxNode = geom::IdxNode;
   using VelocityField = geom::FieldNode<typename Mesh::Vect>;
-  geom::MapFace<std::shared_ptr<ConditionFace>> mf_u_cond_shared_;
-  geom::MapFace<ConditionFace*> mf_u_cond_;
+  geom::MapFace<std::shared_ptr<ConditionFace>> mf_u_cond_;
+  geom::MapFace<std::shared_ptr<ConditionFace>> mf_u_cond_;
   ParticleSystem<Mesh> particles_;
 
  public:
   AdvectionSolverParticles(
       const Mesh& mesh,
       const geom::FieldCell<Scal>& fc_u_initial,
-      const geom::MapFace<std::shared_ptr<ConditionFace>>& mf_u_cond_shared,
+      const geom::MapFace<std::shared_ptr<ConditionFace>>& mf_u_cond,
       geom::FieldNode<Vect>* p_fn_velocity,
       double time, double time_step)
       : AdvectionSolver<Mesh, VelocityField>(time, time_step, p_fn_velocity)
       , mesh(mesh)
-      , mf_u_cond_shared_(mf_u_cond_shared)
+      , mf_u_cond_(mf_u_cond)
       , particles_(mesh, {fc_u_initial}, p_fn_velocity, time, time_step)
   {
-    for (auto it = mf_u_cond_shared_.cbegin() ;
-        it != mf_u_cond_shared_.cend();
+    for (auto it = mf_u_cond_.cbegin() ;
+        it != mf_u_cond_.cend();
         ++it) {
         mf_u_cond_[it->GetIdx()] = it->GetValue().get();
     }
@@ -569,8 +561,6 @@ class AdvectionSolverMultiParticles :
   using IdxFace = geom::IdxFace;
   using IdxNode = geom::IdxNode;
   std::vector<geom::MapFace<std::shared_ptr<ConditionFace>>>
-  v_mf_u_cond_shared_;
-  std::vector<geom::MapFace<ConditionFace*>>
   v_mf_u_cond_;
   geom::FieldNode<Vect> fn_velocity_;
   std::shared_ptr<ParticleSystem<Mesh>> particles_;
@@ -585,7 +575,7 @@ class AdvectionSolverMultiParticles :
       const Mesh& mesh,
       const std::vector<geom::FieldCell<Scal>>& v_fc_u_initial,
       const std::vector<geom::MapFace<std::shared_ptr<ConditionFace>>>&
-      v_mf_u_cond_shared,
+      v_mf_u_cond,
       const VelocityField* p_f_velocity,
       const std::vector<const geom::FieldCell<Scal>*>& v_p_fc_source,
       double time, double time_step,
@@ -596,13 +586,9 @@ class AdvectionSolverMultiParticles :
           time, time_step, p_f_velocity, v_p_fc_source)
       , mesh(mesh)
       , num_fields_(v_fc_u_initial.size())
-      , v_mf_u_cond_shared_(v_mf_u_cond_shared)
+      , v_mf_u_cond_(v_mf_u_cond)
       , v_fc_source_extra_(num_fields_)
   {
-    v_mf_u_cond_.resize(num_fields_);
-    for (size_t i = 0; i < num_fields_; ++i) {
-      v_mf_u_cond_[i] = GetPointers(v_mf_u_cond_shared_[i]);
-    }
 
     std::vector<const geom::FieldCell<Scal>*> v_p_fc_source_extra(num_fields_);
     for (size_t i = 0; i < num_fields_; ++i) {
