@@ -1,0 +1,77 @@
+set string MODULE hydro2d
+
+set string plt_title "Reaction"
+
+# domain
+set vect A (0, 0)
+set vect B (0.2, 0.05)
+
+# rect with c1=1
+set vect A1 (0, 0)
+set vect B1 (0, 0)
+
+# rect with c2=1
+set vect A2 (0, 0)
+set vect B2 (0, 0)
+
+# mesh
+set int Nx 40
+set int Ny 10
+
+# time
+set double T 1
+set double dt 0.001
+
+# physical parameters
+set int num_phases 3
+set string chemistry steady_radiation
+set vect gravity (0., -10)
+set double density_0 1000
+set double density_1 500
+set double density_2 100
+set double viscosity_0 1
+set double viscosity_1 0.01
+set double viscosity_2 0.001
+set double molar_0 1
+set double molar_1 1
+set double molar_2 1
+set double chem_intensity 10
+
+# boundary conditions
+set string condition_top "wall 0 0"
+set string condition_bottom "wall 0 0"
+set double inlet_velocity 0.1
+set string condition_left "inlet $(inlet_velocity) 0"
+set string condition_right "outlet"
+
+# radiation 
+set bool radiation_enable 1
+set vect radiation_lb (0, 0)
+set vect radiation_rt (100, 100)
+set vect radiation_box_lb (0.07, 0.04)
+set vect radiation_box_rt (0.13, 0.06)
+set double absorption_rate_0 100
+set double absorption_rate_1 0
+set double absorption_rate_2 0
+set double radiation_intensity 1
+set vect radiation_direction (0,-1)
+set vect reaction_zone_lb (0,0,0)
+set vect reaction_zone_rt (1e10,1e10,1e10)
+
+# output
+set bool output_mass_fraction_0 1
+set bool output_mass_fraction_1 1
+set bool output_mass_fraction_2 1
+set bool output_volume_fraction_0 1
+set bool output_volume_fraction_1 1
+set bool output_volume_fraction_2 1
+set bool output_radiation 1
+
+set bool output_mass_source_0 1
+set bool output_mass_source_1 1
+set bool output_mass_source_2 1
+
+# settling
+set bool enable_settling_2 1
+set double bubble_radius_2 1e-3
+

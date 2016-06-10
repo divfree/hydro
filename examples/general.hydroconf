@@ -115,6 +115,7 @@ set int force_smooth_times 0
 set bool force_geometric_average 0
 set double guess_extrapolation 0
 #set double antidiffusion_factor 0
+set bool compressible_enable 0
 
 # particles
 set double spawning_gap 0.25
