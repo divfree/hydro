@@ -789,13 +789,8 @@ void hydro<Mesh>::CalcPhasesVolumeFraction() {
       v_fc_volume_fraction[i][idxcell] =
           advection_solver->GetField(i)[idxcell] /
           v_fc_true_density[i][idxcell];
-      v_fc_volume_fraction[i][idxcell] =
-          std::max(v_fc_volume_fraction[i][idxcell], 0.);
       sum += v_fc_volume_fraction[i][idxcell];
     }
-//    for (auto i : phases) {
-//      v_fc_volume_fraction[i][idxcell] /= sum;
-//    }
   }
 }
 
@@ -924,31 +919,38 @@ void hydro<Mesh>::CalcPhaseVelocitySlip() {
   }
 }
 
+// TODO: Resource manager
+// Allow one to specify attributes like REQUIRE(pressure)
+
 template <class Mesh>
 void hydro<Mesh>::CalcPhasesTrueDensity() {
-  // Calc target density
-  for (auto i : phases) {
-    std::string phase = IntToStr(i);
-    Scal rate = P_double["temperature_expansion_rate_" + phase];
-    Scal base = P_double["temperature_expansion_base_" + phase];
-    for (auto idxcell : mesh.Cells()) {
-      v_fc_true_density_target[i][idxcell] = v_true_density[i]
-          * (1. - rate * (heat_solver->GetTemperature()[idxcell] - base));
+  if (P_bool["compressible_enable"]) {
+    // Calc target density
+    for (auto i : phases) {
+      std::string phase = IntToStr(i);
+      Scal rate = P_double["temperature_expansion_rate_" + phase];
+      Scal base = P_double["temperature_expansion_base_" + phase];
+      for (auto idxcell : mesh.Cells()) {
+        v_fc_true_density_target[i][idxcell] = v_true_density[i]
+            * (1. - rate * (heat_solver->GetTemperature()[idxcell] - base));
+      }
     }
+    // Calc true density from target density
+    // and normalize the value to preserve correct volume fraction
+    for (auto idxcell : mesh.Cells()) {
+      Scal alpha = 0.;
+      for (auto i : phases) {
+        alpha += advection_solver->GetField(i)[idxcell]
+            / v_fc_true_density_target[i][idxcell];
+      }
+      for (auto i : phases) {
+        v_fc_true_density[i][idxcell] = v_fc_true_density_target[i][idxcell]
+            * alpha;
+      }
+    }
+  } else {
+    // Just keep initial true density
   }
-  // Calc current density correcting the target density
-  // to make the sum of volume fractions equal to 1
-//  for (auto idxcell : mesh.Cells()) {
-//    Scal alpha = 0.;
-//    for (auto i : phases) {
-//      alpha += advection_solver->GetField(i)[idxcell]
-//          / v_fc_true_density_target[i][idxcell];
-//    }
-//    for (auto i : phases) {
-//      v_fc_true_density[i][idxcell] = v_fc_true_density_target[i][idxcell]
-//          * alpha;
-//    }
-//  }
 }
 
 template <class Mesh>
@@ -1007,7 +1009,7 @@ void hydro<Mesh>::CalcPhasesMassSource() {
 //    for (auto i : phases) {
 //      Limit(v_fc_mass_source[i][idxcell],
 //            v_fc_volume_fraction[i][idxcell],
-//            v_density[i], Scal(fluid_solver->GetTimeStep()));
+//            v_true_density[i], Scal(fluid_solver->GetTimeStep()));
 //    }
 //  }
 }
@@ -1121,17 +1123,19 @@ void hydro<Mesh>::CalcMixtureVolumeSource() {
           / v_fc_true_density[i][idxcell];
     }
   }
-  // Correct the volume source to account for target density
-//  Scal incompressible_relaxation = P_double["incompressible_relaxation"];
-//  for (auto idxcell : mesh.Cells()) {
-//    Scal alpha = 0.;
-//    for (auto i : phases) {
-//      alpha += advection_solver->GetField(i)[idxcell]
-//          / v_fc_true_density_target[i][idxcell];
-//    }
-//    fc_volume_source[idxcell] += (alpha - 1.) / fluid_solver->GetTimeStep()
-//        * incompressible_relaxation;
-//  }
+  if (P_bool["compressible_enable"]) {
+    // Correct the volume source to account for target density
+    Scal compressible_relaxation = P_double["compressible_relaxation"];
+    for (auto idxcell : mesh.Cells()) {
+      Scal alpha = 0.;
+      for (auto i : phases) {
+        alpha += advection_solver->GetField(i)[idxcell]
+            / v_fc_true_density_target[i][idxcell];
+      }
+      fc_volume_source[idxcell] += (alpha - 1.) / fluid_solver->GetTimeStep()
+          * compressible_relaxation;
+    }
+  }
 }
 
 // TODO: Make alias v_fc_density for advection_solver->GetField(i)
@@ -1221,10 +1225,6 @@ void hydro<Mesh>::step() {
 
   ex->timer_.Push("step.fluid");
   fluid_solver->StartStep();
-
-  /*set bool iter_history_enable 0
-set int iter_history_n 1
-set int iter_history_sfixed 0*/
 
   bool iter_history =
       P_bool["iter_history_enable"] && P_int["iter_history_n"] == P_int["n"];
