@@ -581,6 +581,45 @@ class FluidSimple : public FluidSolver<Mesh> {
     }
   }
 
+  void CalcExtForce() {
+    timer_->Push("fluid.1.force-correction");
+    // Interpolate force to faces (considered as given force)
+    ff_ext_force_ = Interpolate(
+        *this->p_fc_force_, mf_force_cond_, mesh,
+        force_geometric_average_);
+    fc_ext_force_restored_.Reinit(mesh);
+
+#pragma omp parallel for
+    for (IntIdx i = 0; i < static_cast<IntIdx>(mesh.Cells().size()); ++i) {
+      IdxCell idxcell(i);
+    //for (auto idxcell : mesh.Cells()) {
+      Vect sum = Vect::kZero;
+      for (size_t i = 0; i < mesh.GetNumNeighbourFaces(idxcell); ++i) {
+        IdxFace idxface = mesh.GetNeighbourFace(idxcell, i);
+        sum += mesh.GetSurface(idxface) *
+            ff_ext_force_[idxface].dot(mesh.GetNormal(idxface)) *
+            mesh.GetCenter(idxcell).dist(mesh.GetCenter(idxface));
+      }
+      fc_ext_force_restored_[idxcell] = sum / mesh.GetVolume(idxcell);
+    }
+    // Interpolated restored force to faces (needed later)
+    ff_ext_force_restored_ = Interpolate(
+        fc_ext_force_restored_, mf_force_cond_, mesh,
+        force_geometric_average_);
+    timer_->Pop();
+  }
+  void CalcKinematicViscosity() {
+    fc_kinematic_viscosity_.Reinit(mesh);
+    for (auto idxcell : mesh.Cells()) {
+      fc_kinematic_viscosity_[idxcell] =
+          (*this->p_fc_viscosity_)[idxcell] /
+          (*this->p_fc_density_)[idxcell];
+    }
+    ff_kinematic_viscosity_ = Interpolate(
+        fc_kinematic_viscosity_, mf_viscosity_cond_, mesh,
+        force_geometric_average_);
+  }
+
  public:
   FluidSimple(const Mesh& mesh,
               const geom::FieldCell<Vect>& fc_velocity_initial,
@@ -751,42 +790,9 @@ class FluidSimple : public FluidSolver<Mesh> {
     UpdateOutletBaseConditions();
     UpdateDerivedConditions();
 
-    timer_->Push("fluid.1.force-correction");
-    // Interpolate force to faces (considered as given force)
-    ff_ext_force_ = Interpolate(
-        *this->p_fc_force_, mf_force_cond_, mesh,
-        force_geometric_average_);
-    fc_ext_force_restored_.Reinit(mesh);
+    CalcExtForce();
 
-#pragma omp parallel for
-    for (IntIdx i = 0; i < static_cast<IntIdx>(mesh.Cells().size()); ++i) {
-      IdxCell idxcell(i);
-    //for (auto idxcell : mesh.Cells()) {
-      Vect sum = Vect::kZero;
-      for (size_t i = 0; i < mesh.GetNumNeighbourFaces(idxcell); ++i) {
-        IdxFace idxface = mesh.GetNeighbourFace(idxcell, i);
-        sum += mesh.GetSurface(idxface) *
-            ff_ext_force_[idxface].dot(mesh.GetNormal(idxface)) *
-            mesh.GetCenter(idxcell).dist(mesh.GetCenter(idxface));
-      }
-      fc_ext_force_restored_[idxcell] = sum / mesh.GetVolume(idxcell);
-    }
-    // Interpolated restored force to faces (needed later)
-    ff_ext_force_restored_ = Interpolate(
-        fc_ext_force_restored_, mf_force_cond_, mesh,
-        force_geometric_average_);
-    timer_->Pop();
-
-    // Calc kinematic viscosity
-    fc_kinematic_viscosity_.Reinit(mesh);
-    for (auto idxcell : mesh.Cells()) {
-      fc_kinematic_viscosity_[idxcell] =
-          (*this->p_fc_viscosity_)[idxcell] /
-          (*this->p_fc_density_)[idxcell];
-    }
-    ff_kinematic_viscosity_ = Interpolate(
-        fc_kinematic_viscosity_, mf_viscosity_cond_, mesh,
-        force_geometric_average_);
+    CalcKinematicViscosity();
 
     timer_->Push("fluid.0.pressure-gradient");
     ff_pressure_ = Interpolate(fc_pressure_prev, mf_pressure_cond_, mesh);
