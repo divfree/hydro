@@ -11,6 +11,13 @@ else()
   set(STATIC_BUILD OFF)
 endif()
 
+# MPI flag
+if (DEFINED MPI)
+  set(MPI_ENABLE ${MPI})
+else()
+  set(MPI_ENABLE OFF)
+endif()
+
 # Default module selection
 if (NOT DEFINED MODULE_HYDRO_2D)
   set(MODULE_HYDRO_2D ON)
@@ -140,5 +147,28 @@ set(LIBRARIES ${LIBRARIES} ${TECIO_LIBRARY})
 # Threads
 find_package(Threads REQUIRED)
 set(LIBRARIES ${LIBRARIES} ${CMAKE_THREAD_LIBS_INIT})
+
+# MPI
+if (MPI_ENABLE) 
+  find_package(MPI REQUIRED)
+  
+  add_definitions("-DMPI_ENABLE")
+  
+  set(CMAKE_CXX_COMPILER mpicxx)
+  set(CMAKE_C_COMPILER mpic)
+  
+  include_directories(${MPI_INCLUDE_PATH})
+  target_link_libraries(${BINARY_NAME} ${MPI_LIBRARIES})
+
+  if (MPI_COMPILE_FLAGS)
+    set_target_properties(${BINARY_NAME} PROPERTIES
+                          COMPILE_FLAGS "${MPI_COMPILE_FLAGS}")
+  endif()
+
+  if (MPI_LINK_FLAGS)
+    set_target_properties(${BINARY_NAME} PROPERTIES
+                          LINK_FLAGS "${MPI_LINK_FLAGS}")
+  endif()
+endif()
 
 target_link_libraries(${BINARY_NAME} ${LIBRARIES})
