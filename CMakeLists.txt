@@ -138,7 +138,7 @@ find_library(TECIO_LIBRARY
 set(LIBRARIES ${LIBRARIES} ${TECIO_LIBRARY})
 
 # Threads
-find_package(Threads)
+find_package(Threads REQUIRED)
 set(LIBRARIES ${LIBRARIES} ${CMAKE_THREAD_LIBS_INIT})
 
 target_link_libraries(${BINARY_NAME} ${LIBRARIES})
