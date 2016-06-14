@@ -8,7 +8,7 @@ file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/tools/revision.cpp"
 if (DEFINED STATIC)
   set(STATIC_BUILD ${STATIC})   
 else()
-  set(STATIC_BUILD ON)
+  set(STATIC_BUILD OFF)
 endif()
 
 # Default module selection
