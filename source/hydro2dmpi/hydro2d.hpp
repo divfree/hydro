@@ -10,7 +10,7 @@
 #include "mesh2d.hpp"
 #include "mesh3d.hpp"
 #include "output.hpp"
-#include "output_paraview"
+#include "output_paraview.hpp"
 #include "heat.hpp"
 #include "advection.hpp"
 #include <memory>
@@ -725,24 +725,26 @@ void hydro<Mesh>::InitOutput() {
     P_string.set(_plt_title, P_string[_exp_name]);
   }
   if (!P_string.exist("filename_field")) {
-    P_string.set("filename_field", P_string[_exp_name] + ".field.plt");
+    P_string.set("filename_field", P_string[_exp_name] + ".field");
   }
   if (!P_string.exist("filename_scalar")) {
-    P_string.set("filename_scalar", P_string[_exp_name] + ".scalar.plt");
+    P_string.set("filename_scalar", P_string[_exp_name] + ".scalar");
   }
 
   std::string field_output_format = P_string["field_output_format"];
   if (field_output_format == "tecplot_binary") {
     session = std::make_shared<output::SessionTecplotBinaryStructured<Mesh>>(
-        content, P_string[_plt_title], outmesh, P_string["filename_field"]);
+        content, P_string[_plt_title], outmesh,
+        P_string["filename_field"] + ".plt");
   } else if (field_output_format == "paraview") {
     session = std::make_shared<output::SessionParaviewStructured<Mesh>>(
-        content, P_string[_plt_title], P_string["filename_field"], outmesh);
+        content, P_string[_plt_title],
+        P_string["filename_field"] + ".vts", outmesh);
   }
 
   session_scalar = std::make_shared<output::SessionTecplotAsciiScalar<Scal>>(
       content_scalar, P_string[_plt_title],
-      P_string[_plt_title], P_string["filename_scalar"]);
+      P_string[_plt_title], P_string["filename_scalar"] + ".dat");
 
   last_frame_time_ = 0;
   last_frame_scalar_time_ = 0;
