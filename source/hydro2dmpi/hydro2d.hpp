@@ -10,6 +10,7 @@
 #include "mesh2d.hpp"
 #include "mesh3d.hpp"
 #include "output.hpp"
+#include "output_paraview"
 #include "heat.hpp"
 #include "advection.hpp"
 #include <memory>
@@ -730,8 +731,14 @@ void hydro<Mesh>::InitOutput() {
     P_string.set("filename_scalar", P_string[_exp_name] + ".scalar.plt");
   }
 
-  session = std::make_shared<output::SessionTecplotBinaryStructured<Mesh>>(
-      content, P_string[_plt_title], outmesh, P_string["filename_field"]);
+  std::string field_output_format = P_string["field_output_format"];
+  if (field_output_format == "tecplot_binary") {
+    session = std::make_shared<output::SessionTecplotBinaryStructured<Mesh>>(
+        content, P_string[_plt_title], outmesh, P_string["filename_field"]);
+  } else if (field_output_format == "paraview") {
+    session = std::make_shared<output::SessionParaviewStructured<Mesh>>(
+        content, P_string[_plt_title], P_string["filename_field"], outmesh);
+  }
 
   session_scalar = std::make_shared<output::SessionTecplotAsciiScalar<Scal>>(
       content_scalar, P_string[_plt_title],
