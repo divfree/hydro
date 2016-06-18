@@ -16,7 +16,7 @@ class SessionParaview : public Session {
   Content content_;
   std::string title_;
   std::string filename_;
-  std::ofstream out_;
+  std::ofstream collection_;
  public:
   SessionParaview(const Content& content,
                   std::string title,
@@ -24,8 +24,8 @@ class SessionParaview : public Session {
       : content_(content),
         title_(title),
         filename_(filename),
-        out_(filename_) {
-    out_.sync_with_stdio(false);
+        collection_(filename_ + ".pvd") {
+    collection_.sync_with_stdio(false);
   }
 };
 
@@ -38,34 +38,112 @@ class SessionParaviewStructured : public SessionParaview {
   using FieldNode = geom::FieldNode<Scal>;
 
   const Mesh& mesh;
-  void WriteDataArrayHeader(std::string name, size_t num_components) {
-    out_ << "        <DataArray "
+  size_t timestep_;
+  void WriteDataArrayHeader(std::ostream& out,
+                            std::string name,
+                            size_t num_components) {
+    out << "        <DataArray "
         << "Name=\"" << name << "\" "
         << "NumberOfComponents=\"" << num_components << "\" "
         << "type=\"Float32\" format=\"ascii\">\n";
   }
-  void WriteDataArrayFooter() {
-    out_ << "        </DataArray>\n";
+  void WriteDataArrayFooter(std::ostream& out) {
+    out << "        </DataArray>\n";
   }
-  void WriteField(EntryField<FieldCell>* entry) {
+  void WriteField(std::ostream& out,
+                  EntryField<FieldCell>* entry) {
     auto& field = entry->GetField();
 
-    WriteDataArrayHeader(entry->GetName(), 1);
+    WriteDataArrayHeader(out, entry->GetName(), 1);
     for (auto idxcell : mesh.Cells()) {
-      out_ << field[idxcell] << " ";
+      out << field[idxcell] << " ";
     }
-    out_ << "\n";
-    WriteDataArrayFooter();
+    out << "\n";
+    WriteDataArrayFooter(out);
   }
-  void WriteField(EntryField<FieldNode>* entry) {
+  void WriteField(std::ostream& out,
+                  EntryField<FieldNode>* entry) {
     auto& field = entry->GetField();
 
-    WriteDataArrayHeader(entry->GetName(), 1);
+    WriteDataArrayHeader(out, entry->GetName(), 1);
     for (auto idxnode : mesh.Nodes()) {
-      out_ << field[idxnode] << " ";
+      out << field[idxnode] << " ";
     }
-    out_ << "\n";
-    WriteDataArrayFooter();
+    out << "\n";
+    WriteDataArrayFooter(out);
+  }
+  void WriteDataFileHeader(std::ostream& out) {
+    out << "<?xml version=\"1.0\"?>\n";
+    out << "<VTKFile type=\"StructuredGrid\" "
+        << "version=\"0.1\" byte_order=\"LittleEndian\">\n";
+
+    MIdx size = mesh.GetBlockCells().GetDimensions();
+    out << "  <StructuredGrid WholeExtent=\""
+        << "0 " << size[0] << " 0 " << size[1] << " 0 " << size[2] << "\">\n";
+
+    out << "    <Piece Extent=\""
+        << "0 " << size[0] << " 0 " << size[1] << " 0 " << size[2] << "\">\n";
+  }
+  void WriteDataFileFooter(std::ostream& out) {
+    out << "    </Piece>\n";
+    out << "  </StructuredGrid>\n";
+    out << "</VTKFile>\n";
+  }
+  void WriteDataFileContent(std::ostream& out) {
+    out << "      <PointData>\n";
+    for (auto& entry_generic : content_) {
+      if (auto entry = dynamic_cast<EntryField<FieldNode>*>(
+          entry_generic.get())) {
+        entry->Prepare();
+        WriteField(out, entry);
+      }
+    }
+    out << "      </PointData>\n";
+
+    out << "      <CellData>\n";
+    for (auto& entry_generic : content_) {
+      if (auto entry = dynamic_cast<EntryField<FieldCell>*>(
+          entry_generic.get())) {
+        entry->Prepare();
+        WriteField(out, entry);
+      }
+    }
+    out << "      </CellData>\n";
+
+    out << "      <Points>\n";
+    WriteDataArrayHeader(out, "mesh", Mesh::dim);
+    for (auto idxnode : mesh.Nodes()) {
+      Vect p = mesh.GetNode(idxnode);
+      for (size_t i = 0; i < Mesh::dim; ++i) {
+        out << p[i] << " ";
+      }
+    }
+    WriteDataArrayFooter(out);
+    out << "      </Points>\n";
+  }
+  void CreateDataFile(std::string datafile_name) {
+    std::ofstream datafile(datafile_name);
+    datafile.sync_with_stdio(false);
+    WriteDataFileHeader(datafile);
+    WriteDataFileContent(datafile);
+    WriteDataFileFooter(datafile);
+  }
+  void WriteCollectionHeader(std::ostream& out) {
+    out << "<?xml version=\"1.0\"?>\n";
+    out << "<VTKFile type=\"Collection\" "
+        << "version=\"0.1\" byte_order=\"LittleEndian\">\n";
+    out << "  <Collection>\n";
+  }
+  void WriteCollectionFooter(std::ostream& out) {
+    out << "  </Collection>\n";
+    out << "</VTKFile>\n";
+  }
+  void WriteCollectionEntry(std::ostream& out,
+                            double time,
+                            std::string datafile_name) {
+     out << "    <DataSet timestep=\"" << time << "\" "
+         << "group=\"\" part=\"0\" "
+         << "file=\"" << datafile_name << "\"/>\n";
   }
  public:
   SessionParaviewStructured(const Content& content,
@@ -73,54 +151,18 @@ class SessionParaviewStructured : public SessionParaview {
                             std::string filename,
                             const Mesh& mesh)
       : SessionParaview(content, title, filename),
-        mesh(mesh) {
-    out_ << "<VTKFile type=\"StructuredGrid\" "
-        << "version=\"0.1\" byte_order=\"LittleEndian\">\n";
-
-    MIdx size = mesh.GetBlockCells().GetDimensions();
-    out_ << "  <StructuredGrid timestep=\"5\" WholeExtent=\""
-        << "0 " << size[0] << " 0 " << size[1] << " 0 " << size[2] << "\">\n";
-
-    out_ << "    <Piece Extent=\""
-        << "0 " << size[0] << " 0 " << size[1] << " 0 " << size[2] << "\">\n";
+        mesh(mesh),
+        timestep_(0) {
+    WriteCollectionHeader(collection_);
   }
   ~SessionParaviewStructured() {
-    out_ << "    </Piece>\n";
-    out_ << "  </StructuredGrid>\n";
-    out_ << "</VTKFile>\n";
+    WriteCollectionFooter(collection_);
   }
   void Write(double time, std::string title) override {
-    out_ << "      <PointData>\n";
-    for (auto& entry_generic : content_) {
-      if (auto entry = dynamic_cast<EntryField<FieldNode>*>(
-          entry_generic.get())) {
-        entry->Prepare();
-        WriteField(entry);
-      }
-    }
-    out_ << "      </PointData>\n";
-
-    out_ << "      <CellData>\n";
-    for (auto& entry_generic : content_) {
-      if (auto entry = dynamic_cast<EntryField<FieldCell>*>(
-          entry_generic.get())) {
-        entry->Prepare();
-        WriteField(entry);
-      }
-    }
-    out_ << "      </CellData>\n";
-
-    out_ << "      <Points>\n";
-    WriteDataArrayHeader("mesh", Mesh::dim);
-    for (auto idxnode : mesh.Nodes()) {
-      Vect p = mesh.GetNode(idxnode);
-      for (size_t i = 0; i < Mesh::dim; ++i) {
-        out_ << p[i] << " ";
-      }
-    }
-    WriteDataArrayFooter();
-    out_ << "      </Points>\n";
-
+    std::string datafile_name = filename_ + "." + IntToStr(timestep_) + ".vts";
+    WriteCollectionEntry(collection_, time, datafile_name);
+    CreateDataFile(datafile_name);
+    ++timestep_;
   }
 };
 

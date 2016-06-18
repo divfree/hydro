@@ -739,7 +739,7 @@ void hydro<Mesh>::InitOutput() {
   } else if (field_output_format == "paraview") {
     session = std::make_shared<output::SessionParaviewStructured<Mesh>>(
         content, P_string[_plt_title],
-        P_string["filename_field"] + ".vts", outmesh);
+        P_string["filename_field"], outmesh);
   }
 
   session_scalar = std::make_shared<output::SessionTecplotAsciiScalar<Scal>>(
