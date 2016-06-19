@@ -79,10 +79,14 @@ class SessionParaviewStructured : public SessionParaview {
 
     MIdx size = mesh.GetBlockCells().GetDimensions();
     out << "  <StructuredGrid WholeExtent=\""
-        << "0 " << size[0] << " 0 " << size[1] << " 0 " << size[2] << "\">\n";
+        << "0 " << size[0]
+        << " 0 " << size[1]
+        << " 0 " << (Mesh::dim == 3 ? size[2] : 0) << "\">\n";
 
     out << "    <Piece Extent=\""
-        << "0 " << size[0] << " 0 " << size[1] << " 0 " << size[2] << "\">\n";
+        << "0 " << size[0]
+        << " 0 " << size[1]
+        << " 0 " << (Mesh::dim == 3 ? size[2] : 0) << "\">\n";
   }
   void WriteDataFileFooter(std::ostream& out) {
     out << "    </Piece>\n";
@@ -111,11 +115,11 @@ class SessionParaviewStructured : public SessionParaview {
     out << "      </CellData>\n";
 
     out << "      <Points>\n";
-    WriteDataArrayHeader(out, "mesh", Mesh::dim);
+    WriteDataArrayHeader(out, "mesh", 3);
     for (auto idxnode : mesh.Nodes()) {
       Vect p = mesh.GetNode(idxnode);
-      for (size_t i = 0; i < Mesh::dim; ++i) {
-        out << p[i] << " ";
+      for (size_t i = 0; i < 3; ++i) {
+        out << (i < Mesh::dim ? p[i] : 0.) << " ";
       }
     }
     WriteDataArrayFooter(out);
