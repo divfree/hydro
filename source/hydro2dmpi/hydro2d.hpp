@@ -10,12 +10,17 @@
 #include "mesh2d.hpp"
 #include "mesh3d.hpp"
 #include "output.hpp"
+#include "output_tecplot.hpp"
 #include "output_paraview.hpp"
 #include "heat.hpp"
 #include "advection.hpp"
 #include <memory>
 #include "fluid.hpp"
 #include "chemistry.hpp"
+
+#ifdef MPI_ENABLE
+#include <mpi.h>
+#endif
 
 
 // TODO: Change parameters on events (e.g. certain time moments)
@@ -68,6 +73,11 @@ class hydro : public TModule
   template <class T>
   using FieldNode = geom::FieldNode<T>;
 
+  struct Flags {
+    bool no_output = false;
+  };
+  Flags flags;
+
   Mesh mesh;
   Mesh outmesh;
   FieldCell<IdxCell> out_to_mesh_;
@@ -104,6 +114,10 @@ class hydro : public TModule
 
   double last_frame_time_;
   double last_frame_scalar_time_;
+
+  // MPI
+  int world_rank;
+  int world_size;
 
   const size_t num_phases;
   const geom::Range<size_t> phases;
@@ -552,6 +566,10 @@ void hydro<Mesh>::InitHeatSolver() {
 
 template <class Mesh>
 void hydro<Mesh>::InitOutput() {
+  if (flags.no_output) {
+    return;
+  }
+
   // Create output mesh
   MIdx output_factor;
   for (size_t i = 0; i < dim; ++i) {
@@ -755,6 +773,17 @@ hydro<Mesh>::hydro(TExperiment* _ex)
     , num_phases(P_int["num_phases"])
     , phases(0, num_phases)
 {
+  flags.no_output = P_bool["no_output"];
+
+#ifdef MPI_ENABLE
+  MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
+  MPI_Comm_size(MPI_COMM_WORLD, &world_size);
+
+  if (world_rank > 0) { // Not master
+    flags.no_output = true;
+  }
+#endif
+
   P_int.set("last_s", 0);
   P_double.set("last_R", 0);
   P_double.set("last_Rn", 0);
@@ -776,10 +805,12 @@ hydro<Mesh>::hydro(TExperiment* _ex)
 
   InitOutput();
 
-  if (P_int["max_frame_index"] > 0) {
-    session->Write(0., P_string[_plt_title] + ":0");
+  if (!flags.no_output) {
+    if (P_int["max_frame_index"] > 0) {
+      session->Write(0., P_string[_plt_title] + ":0");
+    }
+    session_scalar->Write();
   }
-  session_scalar->Write();
 }
 
 template <class Scal>
@@ -1235,7 +1266,8 @@ void hydro<Mesh>::step() {
   fluid_solver->StartStep();
 
   bool iter_history =
-      P_bool["iter_history_enable"] && P_int["iter_history_n"] == P_int["n"];
+      P_bool["iter_history_enable"] && P_int["iter_history_n"] == P_int["n"]
+      && !flags.no_output;
   output::Content content_iter;
   std::shared_ptr<output::Session> session_iter;
   if (!P_string.exist("filename_iter_history")) {
@@ -1310,7 +1342,7 @@ void hydro<Mesh>::step() {
 template <class Mesh>
 void hydro<Mesh>::write_results(bool force)
 {
-  if (ecast(P_bool("no_output"))) {
+  if (flags.no_output) {
     return;
   }
 

@@ -155,7 +155,7 @@ if (MPI_ENABLE)
   add_definitions("-DMPI_ENABLE")
   
   set(CMAKE_CXX_COMPILER mpicxx)
-  set(CMAKE_C_COMPILER mpic)
+  set(CMAKE_C_COMPILER mpicc)
   
   include_directories(${MPI_INCLUDE_PATH})
   target_link_libraries(${BINARY_NAME} ${MPI_LIBRARIES})

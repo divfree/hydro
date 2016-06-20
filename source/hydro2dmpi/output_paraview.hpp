@@ -11,6 +11,8 @@
 
 namespace output {
 
+namespace paraview {
+
 class SessionParaview : public Session {
  protected:
   Content content_;
@@ -162,12 +164,19 @@ class SessionParaviewStructured : public SessionParaview {
   ~SessionParaviewStructured() {
     WriteCollectionFooter(collection_);
   }
-  void Write(double time, std::string title) override {
+  void Write(double time, std::string /*title*/) override {
     std::string datafile_name = filename_ + "." + IntToStr(timestep_) + ".vts";
     WriteCollectionEntry(collection_, time, datafile_name);
     CreateDataFile(datafile_name);
     ++timestep_;
   }
 };
+
+} // namespace paraview
+
+using SessionParaview = paraview::SessionParaview;
+
+template <class Mesh>
+using SessionParaviewStructured = paraview::SessionParaviewStructured<Mesh>;
 
 } // namespace output

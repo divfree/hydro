@@ -9,6 +9,7 @@
 #include "../hydro2dmpi/mesh.hpp"
 #include "../hydro2dmpi/mesh2d.hpp"
 #include "../hydro2dmpi/output.hpp"
+#include "../hydro2dmpi/output_tecplot.hpp"
 #include "../hydro2dmpi/linear.hpp"
 #include "../hydro2dmpi/solver.hpp"
 #include <memory>
