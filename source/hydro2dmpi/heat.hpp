@@ -22,8 +22,7 @@ class HeatSolver : public UnsteadyIterativeSolver {
   using Scal = typename Mesh::Scal;
   using Vect = typename Mesh::Vect;
   using Solver = ConvectionDiffusionScalarImplicit<Mesh>;
-  geom::MapFace<std::shared_ptr<ConditionFace>> mf_conductivity_cond_shared_;
-  geom::MapFace<ConditionFace*> mf_conductivity_cond_;
+  geom::MapFace<std::shared_ptr<ConditionFace>> mf_conductivity_cond_;
   std::shared_ptr<Solver> solver_;
   geom::FieldFace<Scal> ff_conductivity_;
   geom::FieldCell<Scal> fc_uniform_one_;
@@ -34,7 +33,7 @@ class HeatSolver : public UnsteadyIterativeSolver {
       const Mesh& mesh,
       const geom::FieldCell<Scal>& fc_temperature_initial,
       const geom::MapFace<std::shared_ptr<ConditionFace>>&
-      mf_temperature_cond_shared,
+      mf_temperature_cond,
       Scal relaxation_factor,
       const geom::FieldCell<Scal>* p_fc_conductivity,
       const geom::FieldCell<Scal>* p_fc_source,
@@ -50,19 +49,17 @@ class HeatSolver : public UnsteadyIterativeSolver {
         fc_uniform_one_(mesh, 1.),
         p_fc_conductivity_(p_fc_conductivity)
   {
-    for (auto it = mf_temperature_cond_shared.cbegin() ;
-        it != mf_temperature_cond_shared.cend();
+    for (auto it = mf_temperature_cond.cbegin() ;
+        it != mf_temperature_cond.cend();
         ++it) {
-      mf_conductivity_cond_shared_[it->GetIdx()] =
+      mf_conductivity_cond_[it->GetIdx()] =
           std::make_shared<solver::ConditionFaceDerivativeFixed<Scal>>(0.);
     }
-
-    mf_conductivity_cond_ = GetPointers(mf_conductivity_cond_shared_);
 
     // Initialize solver
     solver_ = std::make_shared<Solver>(
         mesh, fc_temperature_initial,
-        mf_temperature_cond_shared,
+        mf_temperature_cond,
         geom::MapCell<std::shared_ptr<ConditionCell>>() /*empty*/,
         relaxation_factor, &fc_uniform_one_, &ff_conductivity_,
         p_fc_source, p_ff_vol_flux, time, time_step,

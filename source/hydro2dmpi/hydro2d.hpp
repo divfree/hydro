@@ -509,7 +509,6 @@ void hydro<Mesh>::InitRadiation() {
       }
     }
   }
-  mf_cond_radiation = GetPointers(mf_cond_radiation_shared);
   fc_radiation.Reinit(mesh, 0.);
 }
 
@@ -524,17 +523,17 @@ void hydro<Mesh>::InitHeatSolver() {
 
   // Boundary conditions for temperature
   geom::MapFace<std::shared_ptr<solver::ConditionFace>>
-  mf_temperature_cond_shared;
+  mf_temperature_cond;
   geom::Rect<Vect> heat_box(GetVect<Vect>(P_vect["heat_box_lb"]),
                             GetVect<Vect>(P_vect["heat_box_rt"]));
   for (auto idxface : mesh.Faces()) {
     if (!mesh.IsInner(idxface)) {
       if (heat_box.IsInside(mesh.GetCenter(idxface))) {
-        mf_temperature_cond_shared[idxface] =
+        mf_temperature_cond[idxface] =
             std::make_shared<solver::
             ConditionFaceValueFixed<Scal>>(P_double["heat_box_temperature"]);
       } else {
-        mf_temperature_cond_shared[idxface] =
+        mf_temperature_cond[idxface] =
             std::make_shared<solver::
             ConditionFaceDerivativeFixed<Scal>>(0.);
       }
@@ -543,7 +542,7 @@ void hydro<Mesh>::InitHeatSolver() {
 
   heat_solver = std::make_shared<solver::HeatSolver<Mesh>>(
       mesh, fc_temperature_initial,
-      mf_temperature_cond_shared,
+      mf_temperature_cond,
       P_double["heat_relaxation_factor"],
       &fc_conductivity, &fc_temperature_source,
       &fluid_solver->GetVolumeFlux(solver::Layers::iter_curr),
@@ -1075,7 +1074,7 @@ void hydro<Mesh>::AppendAntidiffusionVolumeFlux() {
     for (auto i : phases) {
       v_fc_antidiffusion[i] = solver::Gradient(
           solver::Interpolate(advection_solver->GetField(i),
-                              GetPointers(v_mf_partial_density_cond_[i]), mesh),
+                              v_mf_partial_density_cond_[i], mesh),
           mesh);
       for (auto idxcell : mesh.Cells()) {
         Scal c = v_fc_volume_fraction[i][idxcell];
