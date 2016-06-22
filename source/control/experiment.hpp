@@ -10,6 +10,7 @@
 #include "../control/metrics.hpp"
 #include <memory>
 #include <map>
+#include "../control/logger.hpp"
 
 #define Map_number 5
 extern string Map_name[Map_number];
@@ -60,8 +61,7 @@ public:
 
   void open_file(ofstream& fout, string filename);
   void open_file(ifstream& fin, string filename);
-  ofstream flog;
-  void logger(string msg);
+  logger::Logger logger;
 
   std::shared_ptr<TModule> module;
 
@@ -89,8 +89,10 @@ class TExperiment_ref
 {
   public:
   TExperiment* ex;
-  TExperiment_ref(TExperiment* _ex) : ex(_ex),
-  P_bool(ex->P_bool), P_int(ex->P_int), P_double(ex->P_double), P_string(ex->P_string), P_vect(ex->P_vect), output_dir(ex->output_dir), flog(ex->flog) {;}
+  TExperiment_ref(TExperiment* _ex)
+      : ex(_ex), P_bool(ex->P_bool), P_int(ex->P_int), P_double(ex->P_double),
+        P_string(ex->P_string), P_vect(ex->P_vect), output_dir(ex->output_dir),
+        logger(ex->logger) {;}
   BinSearchSet2<string, bool>& P_bool;
   BinSearchSet2<string, int>& P_int;
   BinSearchSet2<string, double>& P_double;
@@ -99,7 +101,7 @@ class TExperiment_ref
   inline bool flag(string flag_name) { return ex->flag(flag_name); }
   inline void status_change(ES new_status) { ex->status_change(new_status); }
   string& output_dir;
-  ofstream& flog;
+  logger::Logger& logger;
 };
 
 class TModule : virtual public TExperiment_ref

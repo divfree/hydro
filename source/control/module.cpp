@@ -30,15 +30,17 @@ void TModule::update_step_time(double seconds) {
 void TModule::update_dt()
 {
   double dt_old=dt;
-  if(P_double.exist("T0") && P_double.exist("dt0") && (tn<P_double["T0"])) {
+  if (P_double.exist("T0") && P_double.exist("dt0") && (tn<P_double["T0"])) {
     dt=P_double["dt0"];
-  }
-  else if(P_double.exist("T1") && P_double.exist("dt1") && (tn<P_double["T1"]))  {
+  } else if(P_double.exist("T1") && P_double.exist("dt1") && (tn<P_double["T1"]))  {
     dt=P_double["dt1"];
+  } else {
+    dt=P_double["dt"];
   }
-  else dt=P_double["dt"];
 
-  if(dt!=dt_old) flog<<"Time step changed from "<<dt_old<<" to "<<dt<<endl;
+  if (dt!=dt_old) {
+    logger() << "Time step changed from " << dt_old << " to " << dt;
+  }
 }
 
 void TModule::cycle()
@@ -87,23 +89,21 @@ double TModule::get_increased_time(double t, double dt)
   return t+dt;
 }
 
-void TModule::thread()
-{
-  try
-  {
-    while(!ex->st_finished && !ex->sig_term)
-    {
+void TModule::thread() {
+  try {
+    while(!ex->st_finished && !ex->sig_term) {
       cycle();
     }
     ex->term();
-    cout<<"("<<ex->name<<", "<<ex->P_string["name"]<<" ) done with status "<<ex->status_name()<<endl;
-    ex->console->cflog<<"("<<ex->name<<", "<<ex->P_string["name"]<<" ) done with status "<<ex->status_name()<<", "<<ex->console->undone_exp_count()-1<<" left"<<endl;
+    ex->console->logger_info() << "(" << ex->name << ", "
+        << ex->P_string["name"] << " ) done with status "
+        << ex->status_name() << ", " << ex->console->undone_exp_count() - 1
+        << " left";
   }
-  catch(string msg)
-  {
+  catch(string msg) {
     ex->st_error=true;
     cout<<"ERROR: "<<msg<<endl;
-    ex->flog<<"ERROR: "<<msg<<endl;
+    ex->logger() << "ERROR: " << msg;
   }
   ex->st_thread=false;
   ex->console->threads_count--;
@@ -112,14 +112,20 @@ void TModule::thread()
 
 void TModule::write_step_header()
 {
-  ex->flog<<"BEGIN. t="<<tnp<<", n="<<P_int["n"]+1<<endl;
+  ex->logger() << "BEGIN. t=" << tnp << ", n=" << P_int["n"] + 1;
 }
 
 void TModule::write_step_footer()
 {
-  ex->flog<<"END. stat: s="<<P_int["last_s"]<<", Rs="<<P_double["last_R"];
-  if(P_double.exist("last_Rn")) ex->flog<<", Rn="<<P_double["last_Rn"];
-  ex->flog<<", t_all="<<P_double["last_step_time"]<<", mem="<<P_double["memory"]<<"MB"<<endl<<endl;
+  auto logger_entry = ex->logger();
+  logger_entry << "END. stat: s=" << P_int["last_s"]
+      << ", Rs=" << P_double["last_R"];
+  if(P_double.exist("last_Rn")) {
+    logger_entry << ", Rn=" << P_double["last_Rn"];
+  }
+  logger_entry << ", t_all=" << P_double["last_step_time"]
+      << ", mem=" << P_double["memory"] << "MB";
+  logger_entry << "\n";
 }
 
 void TModule::save_state(string filename)
@@ -143,7 +149,7 @@ void Iterations::write_stat_s(int s, double R)
 {
   if(ex->flag(_stat_s_enable))
   {
-    flog<<".....s="<<s<<", Rs="<<R<<endl;
+    logger() << ".....s=" << s << ", Rs=" << R;
   }
 }
 
@@ -266,7 +272,9 @@ void signal_analyzer::min_handler()
   min_value=uc_prev;
   min_value_diff_rel=abs(min_value-min_value_old)/abs(0.5*(min_value_old+min_value));
 
-  flog<<"Signal_analyzer: minimum found t="<<min_t<<" value="<<min_value<<" interval="<<min_interval<<" diff="<<min_value_diff_rel<<endl;
+  logger() << "Signal_analyzer: minimum found t="
+      << min_t << " value=" << min_value
+      << " interval=" << min_interval << " diff=" << min_value_diff_rel;
 
 
   if(min_value_diff_rel<min_diff_threshold && count>10)
@@ -277,5 +285,5 @@ void signal_analyzer::min_handler()
 void signal_analyzer::min_diff_threshold_handler()
 {
   threshold_reached=true;
-  flog<<"Signal_analyzer: threshold reached"<<endl;
+  logger() << "Signal_analyzer: threshold reached";
 }

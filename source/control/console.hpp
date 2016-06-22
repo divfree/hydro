@@ -6,6 +6,7 @@
 #include "experiment.hpp"
 #include "pvar.hpp"
 #include <atomic>
+#include "logger.hpp"
 
 #define CMap_number 4
 extern string Map_name[Map_number];
@@ -18,12 +19,13 @@ public:
   typedef void (TConsole::*TCmd)(string);
   TConsole();
   ~TConsole();
+  logger::Logger logger_error;
+  logger::Logger logger_warning;
+  logger::Logger logger_info;
+  logger::Logger logger_prompt;
   BinSearchSet<string, TCmd> Commands;
   BinSearchSet<string, string> Commands_desc;
   void init_commands(TConsole& console);
-  void error(string msg);
-  void write_msg(string msg);
-  void msg_eol(string msg);
   string prompt();
   string cur_exp_name;
   // COMMANDS
@@ -69,8 +71,6 @@ public:
   void cmd_open_log(string arg);
   void cmd_write_parabolic_profile_plt(string arg);
   void cmd_write_pois_cyl(string arg);
-
-  ofstream cflog;
 
   // EXP CONTROL FUNCTIONS
   void exp_start(TExperiment*);
