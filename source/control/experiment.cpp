@@ -137,59 +137,53 @@ void TExperiment::open_file(ifstream& fin, string filename)
 
 void TExperiment::init_log()
 {
-  if(!ecast(P_bool("no_output")))
-  {
-    string filename_log=*P_string.set("filename_log", P_string[_exp_name]+".log");
-    open_file(flog, filename_log);
-    flog << "# hydro3 experiment\n";
-    flog << "# revision " << kGitRevision << "\n";
-    flog << "# EXPERIMENT PARAMETERS" << std::endl;
+  if(!ecast(P_bool("no_output"))) {
+    auto log_file = std::make_shared<std::ofstream>(
+        *P_string.set("filename_log", P_string[_exp_name]+".log"));
+    logger.SetStream(log_file);
+    logger() << "# hydro3 experiment";
+    logger() << "# revision " << kGitRevision;
+    logger() << "# EXPERIMENT PARAMETERS";
 
-    for(int k=0; k<Map_number; k++)
-    if(Map[k]->get_length()>0)
-    {
-      flog<<"# "<<Map_name[k]<<" parameters"<<endl;
-      for(int i=0; i<Map[k]->get_length(); i++)
-      {
-        flog<<"set "<<Map_name[k]<<" "<<Map[k]->get_key(i)<<" ";
-        Map[k]->write_data_by_index(flog, i);
-        flog<<endl;
+    for (int k = 0; k < Map_number; k++)
+    if (Map[k]->get_length() > 0) {
+      logger() << "# " << Map_name[k] << " parameters";
+      for (int i = 0; i < Map[k]->get_length(); ++i) {
+        auto logger_entry = logger();
+        logger_entry << "set "  << Map_name[k] << " "
+            << Map[k]->get_key(i) << " ";
+        std::stringstream buf;
+        Map[k]->write_data_by_index(buf, i);
+        logger_entry << buf.rdbuf();
       }
-      flog<<endl;
+      logger();
     }
+    logger();
   }
 }
 
-void TExperiment::term()
-{
+void TExperiment::term() {
   string* after_finish_ptr=P_string("after_finish_script");
-  if(after_finish_ptr)
-  {
+  if (after_finish_ptr) {
     string script=*after_finish_ptr;
     console->cmd_run(script);
   }
 
-  if(!ecast(P_bool("no_output")))
-  {
-    flog<<endl<<"Experiment terminated."<<endl;
-    double /*t_FVM=P_double["total_time_FVM"], t_part=P_double["total_time_particles"], */t_all=P_double["total_step_time"];
-    flog<<"Execution time:"<<endl;
-    /*flog<<"FVM: "<<seconds_to_hms(t_FVM)<<" ("<<round(t_FVM/t_all*10000)/100.0<<"%)"<<endl;
-    flog<<"particles: "<<seconds_to_hms(t_part)<<" ("<<round(t_part/t_all*10000)/100.0<<"%)"<<endl;*/
-    flog<<"all: "<<seconds_to_hms(t_all)<<endl;
+  if (!ecast(P_bool("no_output"))) {
+    logger() << "Experiment terminated.";
+    double t_all=P_double["total_step_time"];
+    logger() <<"Execution time:";
+    logger() << "all: " << seconds_to_hms(t_all);
 
-    if(P_int.exist("cells_number") && P_int.exist("s_sum"))
-    {
-      P_double.set("t_cell", t_all/(P_int["cells_number"]*P_int["s_sum"]));
-      flog<<"one cell, one iter: "<<P_double["t_cell"]<<endl;
+    if (P_int.exist("cells_number") && P_int.exist("s_sum")) {
+      P_double.set("t_cell", t_all / (P_int["cells_number"] * P_int["s_sum"]));
+      logger() << "one cell, one iter: " << P_double["t_cell"];
     }
+    logger();
 
-    flog << std::endl;
     for (auto entry : timer_.GetTotalTime()) {
-      flog << entry.first << " : " << entry.second << std::endl;
+      logger() << entry.first << " : " << entry.second;
     }
-
-    flog.close();
   }
 
   console->pvar->table_record(this);
@@ -200,11 +194,6 @@ void TExperiment::term()
 void TExperiment::thread()
 {
   module->thread();
-}
-
-void TExperiment::logger(string msg)
-{
-  flog<<msg<<endl;
 }
 
 TExperiment::~TExperiment()

@@ -32,7 +32,7 @@ class Logger {
       return *this;
     }
     ~LogStream() {
-      (*parent_->p_stream_) << prefix_ << buf_.rdbuf();
+      (*parent_->p_stream_) << prefix_ << buf_.str();
       if (!no_eol_) {
         (*parent_->p_stream_) << std::endl;
       } else {
@@ -44,14 +44,14 @@ class Logger {
   Logger(bool no_eol = false)
       : p_stream_(&std::cout, [](std::ostream*){}),
         no_eol_(no_eol) {}
-  Logger(std::shared_ptr<std::ofstream> p_stream, bool no_eol = false)
+  Logger(std::shared_ptr<std::ostream> p_stream, bool no_eol = false)
       : p_stream_(p_stream),
         no_eol_(no_eol) {}
   Logger(std::string prefix, bool no_eol = false)
       : default_prefix_(prefix),
         p_stream_(&std::cout, [](std::ostream*){}),
         no_eol_(no_eol) {}
-  Logger(std::shared_ptr<std::ofstream> p_stream, std::string prefix,
+  Logger(std::shared_ptr<std::ostream> p_stream, std::string prefix,
          bool no_eol = false)
       : default_prefix_(prefix),
         p_stream_(p_stream),
@@ -61,6 +61,9 @@ class Logger {
   }
   LogStream operator()(const std::string prefix) {
     return LogStream(this, prefix, no_eol_);
+  }
+  void SetStream(std::shared_ptr<std::ostream> p_stream) {
+    p_stream_ = p_stream;
   }
 };
 

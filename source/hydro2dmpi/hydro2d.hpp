@@ -1301,8 +1301,8 @@ void hydro<Mesh>::step() {
       ++P_int["s_sum"];
       P_int["s"] = static_cast<int>(fluid_solver->GetIterationCount());
 
-      flog << ".....s=" << fluid_solver->GetIterationCount()
-          << ", Rs=" << fluid_solver->GetConvergenceIndicator() << std::endl;
+      logger() << ".....s=" << fluid_solver->GetIterationCount()
+          << ", Rs=" << fluid_solver->GetConvergenceIndicator();
 
       if (iter_history) {
         session_iter->Write();
@@ -1355,7 +1355,7 @@ void hydro<Mesh>::write_results(bool force)
       time >= last_frame_time_ + frame_duration)) {
     last_frame_time_ = time;
     session->Write(time, P_string[_plt_title] + ":" + IntToStr(P_int["n"]));
-    flog<<"Frame "<<(P_int["current_frame"]++)<<": t="<<time<<endl;
+    logger() << "Frame " << (P_int["current_frame"]++) << ": t=" << time;
   }
 
   const size_t max_frame_scalar_index = P_int["max_frame_scalar_index"];
@@ -1364,7 +1364,8 @@ void hydro<Mesh>::write_results(bool force)
   if (force || time >= last_frame_scalar_time_ + frame_scalar_duration) {
     last_frame_scalar_time_ = time;
     session_scalar->Write();
-    flog<<"Frame_scalar "<<(P_int["current_frame_scalar"]++)<<": t="<<time<<endl;
+    logger() << "Frame_scalar " << (P_int["current_frame_scalar"]++)
+        << ": t=" << time;
   }
 }
 

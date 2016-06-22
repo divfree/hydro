@@ -470,7 +470,7 @@ void hydro<Mesh>::write_results(bool force) {
       time >= last_frame_time_ + frame_duration)) {
     last_frame_time_ = time;
     session->Write(time, "step");
-    flog<<"Frame "<<(P_int["current_frame"]++)<<": t="<<time<<endl;
+    logger() << "Frame " << (P_int["current_frame"]++) << ": t=" << time;
   }
 
   const size_t max_frame_scalar_index = P_int["max_frame_scalar_index"];
@@ -479,7 +479,8 @@ void hydro<Mesh>::write_results(bool force) {
   if (force || time >= last_frame_scalar_time_ + frame_scalar_duration) {
     last_frame_scalar_time_ = time;
     session_scalar->Write();
-    flog<<"Frame_scalar "<<(P_int["current_frame_scalar"]++)<<": t="<<time<<endl;
+    logger() << "Frame_scalar " << (P_int["current_frame_scalar"]++)
+        << ": t=" << time;
   }
 }
 
