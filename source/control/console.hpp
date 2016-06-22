@@ -72,8 +72,6 @@ public:
   void cmd_write_parabolic_profile_plt(string arg);
   void cmd_write_pois_cyl(string arg);
 
-  ofstream cflog;
-
   // EXP CONTROL FUNCTIONS
   void exp_start(TExperiment*);
   void exp_create_thread(TExperiment*);

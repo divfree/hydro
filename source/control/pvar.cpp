@@ -51,7 +51,7 @@ void PVar::step(int depth)
   {
     variations_count++;
     console->CP_int["pvar_count"]=variations_count;
-    console->cflog<<"pvar "<<variations_count<<endl;
+    console->logger_info() << "pvar " << variations_count;
 
     // wait for termination of current experiments
     while(console->pending_count>0)
@@ -91,7 +91,7 @@ void PVar::table_open(string arg)
   string filename;
   buf>>filename;
   console->open_file(ftable,filename);
-  console->cflog<<"Opened pvar_table file: '"<<filename<<"'"<<endl;
+  console->logger_info() << "Opened pvar_table file: '" << filename << "'";
 
   table_columns.change_N(0);
   while(!buf.eof())

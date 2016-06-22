@@ -50,7 +50,8 @@ void TConsole::cmd_add_experiment(string arg) {
 }
 
 void TConsole::exp_del(TExperiment* ex) {
-  cflog<<"("<<ex->name<<", "<<ex->P_string["name"]<<" ) deleted"<<endl;
+  logger_info() << "(" << ex->name << ", "
+      << ex->P_string["name"] << " ) deleted";
   if(!ex->st_term)
   {
     exp_term(ex);
@@ -168,8 +169,7 @@ void TConsole::exp_create_thread(TExperiment* experiment) {
     cur_exp.st_thread=true;
     pending_count--;
     threads_count++;
-    cout<<"("<<cur_exp.name<<") started"<<endl;
-    cflog<<"("<<cur_exp.name<<") started"<<endl;
+    logger_info() << "(" << cur_exp.name << ") started";
   }
   else
   {
@@ -542,8 +542,7 @@ void TConsole::cmd_open_log(string arg) {
   buf.str(arg);
   string filename;
   buf>>filename;
-  cflog.open(filename);
-  cflog<<"Console log"<<endl;
+  // TODO: Create logger for given filename
 }
 
 void TConsole::cmd_test(string) {
@@ -744,8 +743,7 @@ TConsole::~TConsole() {
   {
     cmd_exit("");
   }
-  cflog<<"Console termination"<<endl;
-  cflog.close();
+  logger_info() << "Console termination";
   delete pvar;
 }
 
@@ -939,7 +937,7 @@ void TConsole::scheduler_thread() {
       TExperiment* ex=Experiments.get_data(i);
       if(ex->st_init && !ex->st_thread && (ex->st_term || ex->st_error))
       {
-        cflog<<"Removing of "<<ex->name<<endl;
+        logger_info() << "Removing of " << ex->name;
         exp_del(Experiments.get_data(i));
         i--;
       }

@@ -96,8 +96,10 @@ void TModule::thread()
       cycle();
     }
     ex->term();
-    cout<<"("<<ex->name<<", "<<ex->P_string["name"]<<" ) done with status "<<ex->status_name()<<endl;
-    ex->console->cflog<<"("<<ex->name<<", "<<ex->P_string["name"]<<" ) done with status "<<ex->status_name()<<", "<<ex->console->undone_exp_count()-1<<" left"<<endl;
+    ex->console->logger_info() << "(" << ex->name << ", "
+        << ex->P_string["name"] << " ) done with status "
+        << ex->status_name() << ", " << ex->console->undone_exp_count() - 1
+        << " left";
   }
   catch(string msg)
   {
