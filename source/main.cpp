@@ -56,7 +56,7 @@ int main(int argc, char* argv[])
       console.cmd_wait_for_experiments_completion("");
     }
     catch(string msg) {
-      console.error(msg);
+      console.logger_error() << msg;
       exitcode=-1;
     }
     cout<<endl;

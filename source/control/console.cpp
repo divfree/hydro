@@ -653,7 +653,11 @@ void TConsole::cmd_mkdir(string arg) {
 }
 
 
-TConsole::TConsole() {
+TConsole::TConsole()
+    : logger_error("Error: "),
+      logger_warning("Warning: "),
+      logger_info(),
+      logger_prompt(true) {
   finished=false;
 
   TParameter<string>* CMap1[CMap_number]={&CP_bool, &CP_double, &CP_int, &CP_string};
@@ -759,19 +763,6 @@ void extract_cmd_name_and_arg(string str, string& name, string& arg) {
   }
 }
 
-void TConsole::error(string msg) {
-  cout<<"ERROR: "<<msg<<endl;
-  cflog<<"ERROR: "<<msg<<endl;
-}
-
-void TConsole::write_msg(string msg) {
-  cout<<msg;
-}
-
-void TConsole::msg_eol(string msg) {
-  cout<<msg<<endl;
-}
-
 string TConsole::prompt() {
   //string str=get_time("%X");
   string str=cur_exp_name;
@@ -779,10 +770,8 @@ string TConsole::prompt() {
 }
 
 void TConsole::execute() {
-  while(!flag_exit)
-  {
-    try
-    {
+  while (!flag_exit) {
+    try {
       cout<<prompt();
       string str_input="";
       getline(cin, str_input);
@@ -790,16 +779,15 @@ void TConsole::execute() {
       string name, arg;
       extract_cmd_name_and_arg(str_input, name, arg);
       TCmd* ptr=Commands(name);
-      if(ptr)
-      {
+      if(ptr) {
         (this->**ptr)(arg);
+      } else {
+        logger_error() << "Unknown command: '" << name << "'";
       }
-      else cout<<"Unknown command: '"<<name<<"'";
       cout<<endl;
     }
-    catch(string msg)
-    {
-      error(msg);
+    catch(string msg) {
+      logger_error() << msg;
     }
   }
   finished=true;
@@ -811,7 +799,7 @@ void TConsole::check_directory(string dirname) {
     char c=0;
     while(c!='y' && c!='n')
     {
-      write_msg("Directory '"+dirname+"' doesn't exist. Create? [y/n] ");
+      logger_prompt() << "Directory '"+dirname+"' doesn't exist. Create? [y/n] ";
       char c;
       if(ecast(CP_bool("force_yes")))
       {
@@ -850,20 +838,18 @@ void TConsole::check_file_good(ifstream& file, string filename) {
 void TConsole::confirmation_yes_no(string msg) {
   while(true)
   {
-    write_msg(msg+" [y/n]");
+    logger_prompt() << msg << " [y/n] ";
     char c;
-    if(ecast(CP_bool("force_yes")))
-    {
+    if (ecast(CP_bool("force_yes"))) {
       c='y';
-    } else
-    {
+    } else {
       cin>>c;
     }
-    if(c=='n')
-    {
+    if (c == 'n') {
       throw string("Operation canceled");
-    } else
-    if(c=='y') break;
+    } else if (c == 'y') {
+      break;
+    }
   }
 }
 
@@ -872,7 +858,8 @@ void TConsole::check_file_exists(string filename) {
   {
     while(true)
     {
-      write_msg("File '"+filename+"' already exists. Overwrite? [y/n/a(all)] ");
+      logger_prompt() << "File '" << filename
+          << "' already exists. Overwrite? [y/n/a(all)] ";
       char c;
       if(ecast(CP_bool("force_yes")))
       {
@@ -900,15 +887,15 @@ void TConsole::open_file(ofstream& fout, string filename) {
   check_file_exists(path);
   fout.open(path);
   check_file_good(fout,filename);
-  msg_eol("File '"+filename+"' is opened (write-mode)");
+  logger_info() << "File '" << filename << "' is opened (write-mode)";
   fout.precision(16);
 }
 
 void TConsole::open_file(ifstream& fin, string filename) {
-  string path=filename;
+  string path = filename;
   fin.open(path);
-  check_file_good(fin,filename);
-  msg_eol("File '"+filename+"' is opened (read-mode)");
+  check_file_good(fin, filename);
+  logger_info() << "File '" << filename << "' is opened (read-mode)";
 }
 
 int TConsole::running_exp_count() {

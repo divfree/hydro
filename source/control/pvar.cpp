@@ -67,7 +67,7 @@ void PVar::step(int depth)
       }
       catch(string msg)
       {
-        console->error("pvar: "+msg);
+        console->logger_error() << "pvar: " + msg;
       }
     }
     else

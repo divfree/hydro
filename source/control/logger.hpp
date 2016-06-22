@@ -12,43 +12,55 @@ class Logger {
  protected:
   const std::string default_prefix_;
   std::shared_ptr<std::ostream> p_stream_;
+  const bool no_eol_ = false;
  public:
   class LogStream {
     Logger* parent_;
     const std::string prefix_;
     std::stringstream buf_;
+    const bool no_eol_;
    public:
     LogStream() = delete;
     LogStream(LogStream&&) = default;
-    LogStream(Logger* parent)
-        : parent_(parent) {}
-    LogStream(Logger* parent, std::string prefix)
-        : parent_(parent), prefix_(prefix) {}
+    LogStream(Logger* parent, bool no_eol)
+        : parent_(parent), no_eol_(no_eol) {}
+    LogStream(Logger* parent, std::string prefix, bool no_eol)
+        : parent_(parent), prefix_(prefix), no_eol_(no_eol) {}
     template <class T>
     LogStream& operator<<(const T& value) {
       buf_ << value;
       return *this;
     }
     ~LogStream() {
-      (*parent_->p_stream_) << prefix_ << buf_.rdbuf() << std::endl;
+      (*parent_->p_stream_) << prefix_ << buf_.rdbuf();
+      if (!no_eol_) {
+        (*parent_->p_stream_) << std::endl;
+      } else {
+        (*parent_->p_stream_).flush();
+      }
     }
   };
 
-  Logger()
-      : p_stream_(&std::cout, [](std::ostream*){}) {}
-  Logger(std::shared_ptr<std::ofstream> p_stream)
-      : p_stream_(p_stream) {}
-  Logger(std::string prefix)
+  Logger(bool no_eol = false)
+      : p_stream_(&std::cout, [](std::ostream*){}),
+        no_eol_(no_eol) {}
+  Logger(std::shared_ptr<std::ofstream> p_stream, bool no_eol = false)
+      : p_stream_(p_stream),
+        no_eol_(no_eol) {}
+  Logger(std::string prefix, bool no_eol = false)
       : default_prefix_(prefix),
-        p_stream_(&std::cout, [](std::ostream*){}) {}
-  Logger(std::shared_ptr<std::ofstream> p_stream, std::string prefix)
+        p_stream_(&std::cout, [](std::ostream*){}),
+        no_eol_(no_eol) {}
+  Logger(std::shared_ptr<std::ofstream> p_stream, std::string prefix,
+         bool no_eol = false)
       : default_prefix_(prefix),
-        p_stream_(p_stream) {}
+        p_stream_(p_stream),
+        no_eol_(no_eol) {}
   LogStream operator()() {
-    return LogStream(this, default_prefix_);
+    return LogStream(this, default_prefix_, no_eol_);
   }
   LogStream operator()(const std::string prefix) {
-    return LogStream(this, prefix);
+    return LogStream(this, prefix, no_eol_);
   }
 };
 
