@@ -32,24 +32,16 @@ template <class Vect>
 Vect GetVect(const column<double>& v);
 
 template <>
-geom::Vect<double, 2> GetVect<geom::Vect<double, 2>>(const column<double>& v) {
-  return geom::Vect<double, 2>(v[0], v[1]);
-}
+geom::Vect<double, 2> GetVect<geom::Vect<double, 2>>(const column<double>& v);
 
 template <>
-geom::Vect<double, 3> GetVect<geom::Vect<double, 3>>(const column<double>& v) {
-  return geom::Vect<double, 3>(v[0], v[1], v[2]);
-}
+geom::Vect<double, 3> GetVect<geom::Vect<double, 3>>(const column<double>& v);
 
 template <>
-geom::Vect<float, 2> GetVect<geom::Vect<float, 2>>(const column<double>& v) {
-  return geom::Vect<float, 2>(float(v[0]), float(v[1]));
-}
+geom::Vect<float, 2> GetVect<geom::Vect<float, 2>>(const column<double>& v);
 
 template <>
-geom::Vect<float, 3> GetVect<geom::Vect<float, 3>>(const column<double>& v) {
-  return geom::Vect<float, 3>(float(v[0]), float(v[1]), float(v[2]));
-}
+geom::Vect<float, 3> GetVect<geom::Vect<float, 3>>(const column<double>& v);
 
 template <class Mesh>
 class hydro : public TModule

@@ -1,11 +1,16 @@
-/*******************************************************************
-******************       CFD SOLVER 2D        **********************
-********************************************************************/
 #include "hydro2d.hpp"
 
+namespace hydro2D_uniform_MPI {
 
-namespace hydro2D_uniform_MPI
-{
+template <>
+geom::Vect<double, 2> GetVect<geom::Vect<double, 2>>(const column<double>& v) {
+  return geom::Vect<double, 2>(v[0], v[1]);
+}
+
+template <>
+geom::Vect<float, 2> GetVect<geom::Vect<float, 2>>(const column<double>& v) {
+  return geom::Vect<float, 2>(float(v[0]), float(v[1]));
+}
 
 namespace registrators {
 
@@ -14,13 +19,6 @@ ModuleRegistrator<hydro<geom::geom2d::MeshStructured<double>>>
 reg_2d_double({"hydro2D_uniform_MPI", "hydro2d"});
 #endif
 
-#ifdef MODULE_HYDRO_3D
-ModuleRegistrator<hydro<geom::geom3d::MeshStructured<double>>>
-reg_3d_double({"hydro3D_uniform_MPI", "hydro3d"});
-#endif
-
 } // namespace registrators
 
-// namespace end
-}
-
+} // namespace hydro2D_uniform_MPI
