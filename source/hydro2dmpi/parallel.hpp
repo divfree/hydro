@@ -137,7 +137,7 @@ class ParallelTools {
   const Processor& GetProcessor(int rank) const {
     return v_processor_[rank];
   }
-  void Send(const geom::FieldCell<Scal>& fc_local, int dest) {
+  void SendLocal(const geom::FieldCell<Scal>& fc_local, int dest) {
     if (dest == current_rank_) {
       throw std::runtime_error("Can't send a message to myself");
     }
@@ -145,7 +145,7 @@ class ParallelTools {
     MPI_Send(fc_local.data(), fc_local.size(),
              MPI_Scal, dest, tag, MPI_COMM_WORLD);
   }
-  void Recv(geom::FieldCell<Scal>& fc_global) {
+  void RecvGlobal(geom::FieldCell<Scal>& fc_global) {
     std::vector<geom::FieldCell<Scal>> v_fc_buf(num_processors_);
     for (int rank = 0; rank < num_processors_; ++rank) {
       if (rank != current_rank_) {
@@ -163,6 +163,32 @@ class ParallelTools {
         }
       }
     }
+  }
+  void SendGlobal(const geom::FieldCell<Scal>& fc_global) {
+    std::vector<geom::FieldCell<Scal>> v_fc_buf(num_processors_);
+    for (int rank = 0; rank < num_processors_; ++rank) {
+      if (rank != current_rank_) {
+        auto& proc = v_processor_[rank];
+        auto& fc_buf = v_fc_buf[rank];
+        v_fc_buf[rank].Reinit(proc.mesh);
+
+        for (auto idxcell : proc.mesh.Cells()) {
+          fc_buf[idxcell] = fc_global[proc.fc_origin[idxcell]];
+        }
+
+        int tag = 0;
+        MPI_Send(fc_buf.data(), fc_buf.size(),
+                 MPI_Scal, rank, tag, MPI_COMM_WORLD);
+      }
+    }
+  }
+  void RecvLocal(geom::FieldCell<Scal>& fc_local, int source) {
+    if (source == current_rank_) {
+      throw std::runtime_error("Can't receive a message from myself");
+    }
+    int tag = 0;
+    MPI_Recv(fc_local.data(), fc_local.size(),
+             MPI_Scal, source, tag, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
   }
 };
 

@@ -111,7 +111,7 @@ class hydro : public TModule
   // MPI
   int world_rank;
   int world_size;
-  std::shared_ptr<solver::ParallelTools<Mesh>> parallel_;
+  std::shared_ptr<solver::ParallelTools<Mesh>> parallel;
 
   const size_t num_phases;
   const geom::Range<size_t> phases;
@@ -220,7 +220,7 @@ void hydro<Mesh>::InitMesh() {
 
 template <class Mesh>
 void hydro<Mesh>::InitParallel() {
-  parallel_ = std::make_shared<solver::ParallelTools<Mesh>>(mesh);
+  parallel = std::make_shared<solver::ParallelTools<Mesh>>(mesh);
 }
 
 template <class Mesh>
@@ -1340,12 +1340,17 @@ void hydro<Mesh>::step() {
   ex->timer_.Pop();
 
   // Parallel test:
-  if (parallel_->GetRank() == 0) {
-    parallel_->Recv(fc_radiation);
+  if (parallel->GetRank() == 0) {
+    FieldCell<Scal> fc_tmp(mesh, 100);
+    parallel->SendGlobal(fc_tmp);
+    parallel->RecvGlobal(fc_radiation);
   } else {
-    FieldCell<Scal> l_fc_radiation(parallel_->GetLocalMesh(),
-                                   parallel_->GetRank());
-    parallel_->Send(l_fc_radiation, 0);
+    FieldCell<Scal> l_fc_radiation(parallel->GetLocalMesh());
+    parallel->RecvLocal(l_fc_radiation, 0);
+    for (auto idxcell : parallel->GetLocalMesh().Cells()) {
+      l_fc_radiation[idxcell] += parallel->GetRank();
+    }
+    parallel->SendLocal(l_fc_radiation, 0);
   }
 }
 
