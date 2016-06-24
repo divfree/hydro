@@ -17,6 +17,7 @@
 #include <memory>
 #include "fluid.hpp"
 #include "chemistry.hpp"
+#include "parallel.hpp"
 
 #ifdef MPI_ENABLE
 #include <mpi.h>
@@ -110,6 +111,7 @@ class hydro : public TModule
   // MPI
   int world_rank;
   int world_size;
+  std::shared_ptr<solver::ParallelTools<Mesh>> parallel_;
 
   const size_t num_phases;
   const geom::Range<size_t> phases;
@@ -119,6 +121,7 @@ class hydro : public TModule
   GetLinearSolverFactory(std::string linear_name,
                          std::string first_prefix = "");
   void InitMesh();
+  void InitParallel();
   void InitFluidSolver();
   void InitAdvectionSolver();
   void InitRadiation();
@@ -213,6 +216,11 @@ void hydro<Mesh>::InitMesh() {
   geom::InitUniformMesh(mesh, domain, mesh_size);
 
   P_int.set("cells_number", static_cast<int>(mesh.GetNumCells()));
+}
+
+template <class Mesh>
+void hydro<Mesh>::InitParallel() {
+  parallel_ = std::make_shared<solver::ParallelTools<Mesh>>(mesh);
 }
 
 template <class Mesh>
@@ -787,6 +795,7 @@ hydro<Mesh>::hydro(TExperiment* _ex)
   P_int.set("current_frame_scalar", 0);
 
   InitMesh();
+  InitParallel();
   InitFluidSolver();
   InitAdvectionSolver();
   InitRadiation();
@@ -1329,6 +1338,15 @@ void hydro<Mesh>::step() {
   ex->timer_.Pop();
 
   ex->timer_.Pop();
+
+  // Parallel test:
+  if (parallel_->GetRank() == 0) {
+    parallel_->Recv(fc_radiation);
+  } else {
+    FieldCell<Scal> l_fc_radiation(parallel_->GetLocalMesh(),
+                                   parallel_->GetRank());
+    parallel_->Send(l_fc_radiation, 0);
+  }
 }
 
 template <class Mesh>
