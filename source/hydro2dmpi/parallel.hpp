@@ -4,6 +4,7 @@
 #include "solver.hpp"
 #include <mpi.h>
 #include <exception>
+#include <utility>
 
 namespace solver {
 
@@ -17,6 +18,10 @@ class ParallelTools {
   using Vect = typename Mesh::Vect;
   static constexpr auto MPI_Scal =
       (sizeof(Scal) == sizeof(double) ? MPI_DOUBLE : MPI_FLOAT);
+  struct CellConnection {
+    IdxCell local;
+    IdxCell remote;
+  };
   struct Processor {
     int rank;
     Mesh mesh;
@@ -24,6 +29,7 @@ class ParallelTools {
     geom::FieldCell<bool> fc_is_active;
     geom::FieldFace<IdxFace> ff_origin;
     geom::FieldFace<bool> ff_is_active;
+    std::vector<std::vector<CellConnection>> v_source_list;
   };
 
  private:
@@ -112,14 +118,39 @@ class ParallelTools {
   }
 
  public:
+  // Processor with rank = 0 acts as a master
+  // and doesn't take part in the computation
   ParallelTools(const Mesh& mesh)
       : global_mesh_(mesh) {
     MPI_Comm_size(MPI_COMM_WORLD, &num_processors_);
     MPI_Comm_rank(MPI_COMM_WORLD, &current_rank_);
 
+    // Init local meshes
     v_processor_.resize(num_processors_);
     for (int rank = 1; rank < num_processors_; ++rank) {
       InitLocalMesh(mesh, rank);
+    }
+
+    // For each cell, find all related processors
+    geom::FieldCell<std::vector<std::pair<int, IdxCell>>>
+    fc_procs(global_mesh_);
+    for (int rank = 1; rank < num_processors_; ++rank) {
+      const Processor& proc = v_processor_[rank];
+      for (auto idxcell : proc.mesh.Cells()) {
+        fc_procs[proc.fc_origin[idxcell]].emplace_back(rank, idxcell);
+      }
+    }
+
+    // Fill inter-processor communication list
+    for (auto idxcell : global_mesh_.Cells()) {
+      for (auto local : fc_procs[idxcell]) {
+        Processor& proc = v_processor_[local.first];
+        proc.v_source_list.resize(num_processors_);
+        for (auto remote : fc_procs[idxcell]) {
+          proc.v_source_list[remote.first].push_back(
+              {local.second, remote.second});
+        }
+      }
     }
   }
   int GetNumProcessors() const {
@@ -189,6 +220,12 @@ class ParallelTools {
     int tag = 0;
     MPI_Recv(fc_local.data(), fc_local.size(),
              MPI_Scal, source, tag, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+  }
+  void SendOverlap(const geom::FieldCell<Scal>& fc_local, int dest) {
+
+  }
+  void RecvOverlap(geom::FieldCell<Scal>& fc_local, int source) {
+
   }
 };
 
