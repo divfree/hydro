@@ -222,10 +222,44 @@ class ParallelTools {
              MPI_Scal, source, tag, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
   }
   void SendOverlap(const geom::FieldCell<Scal>& fc_local, int dest) {
-
+    int rank = current_rank_;
+    std::vector<Scal> buf;
+    for (CellConnection idxcells : v_processor_[dest].v_source_list[rank]) {
+      if (v_processor_[rank].fc_is_active[idxcells.remote]) {
+        buf.push_back(fc_local[idxcells.remote]);
+      }
+    }
+    int tag = 0;
+    MPI_Send(buf.data(), buf.size(),
+             MPI_Scal, dest, tag, MPI_COMM_WORLD);
   }
   void RecvOverlap(geom::FieldCell<Scal>& fc_local, int source) {
+    int rank = current_rank_;
+    std::vector<Scal> buf(v_processor_[rank].v_source_list[source].size());
+    int tag = 0;
+    MPI_Recv(buf.data(), buf.size(),
+             MPI_Scal, source, tag, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 
+    size_t pos = 0;
+    for (CellConnection idxcells : v_processor_[rank].v_source_list[source]) {
+      if (v_processor_[source].fc_is_active[idxcells.remote]) {
+        fc_local[idxcells.local] = buf[pos++];
+      }
+    }
+  }
+  void RecvExtLocal(geom::FieldCell<Scal>& fc_global, int source) {
+    if (source == current_rank_) {
+      throw std::runtime_error("Can't receive a message from myself");
+    }
+    auto& proc = v_processor_[source];
+    geom::FieldCell<Scal> fc_local(proc.mesh);
+    int tag = 0;
+    MPI_Recv(fc_local.data(), fc_local.size(),
+             MPI_Scal, source, tag, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+
+    for (auto idxcell : proc.mesh.Cells()) {
+      fc_global[proc.fc_origin[idxcell]] = fc_local[idxcell];
+    }
   }
 };
 

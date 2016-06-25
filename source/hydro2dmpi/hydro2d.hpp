@@ -108,9 +108,7 @@ class hydro : public TModule
   double last_frame_time_;
   double last_frame_scalar_time_;
 
-  // MPI
-  int world_rank;
-  int world_size;
+  // Parallel (MPI)
   std::shared_ptr<solver::ParallelTools<Mesh>> parallel;
 
   const size_t num_phases;
@@ -221,6 +219,10 @@ void hydro<Mesh>::InitMesh() {
 template <class Mesh>
 void hydro<Mesh>::InitParallel() {
   parallel = std::make_shared<solver::ParallelTools<Mesh>>(mesh);
+
+  if (parallel->GetRank() > 0) { // Not master
+    flags.no_output = true;
+  }
 }
 
 template <class Mesh>
@@ -774,15 +776,6 @@ hydro<Mesh>::hydro(TExperiment* _ex)
     , phases(0, num_phases)
 {
   flags.no_output = P_bool["no_output"];
-
-#ifdef MPI_ENABLE
-  MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
-  MPI_Comm_size(MPI_COMM_WORLD, &world_size);
-
-  if (world_rank > 0) { // Not master
-    flags.no_output = true;
-  }
-#endif
 
   P_int.set("last_s", 0);
   P_double.set("last_R", 0);
@@ -1339,17 +1332,20 @@ void hydro<Mesh>::step() {
 
   ex->timer_.Pop();
 
+  int rank = parallel->GetRank();
+
   // Parallel test:
-  if (parallel->GetRank() == 0) {
-    FieldCell<Scal> fc_tmp(mesh, 100);
-    parallel->SendGlobal(fc_tmp);
-    parallel->RecvGlobal(fc_radiation);
-  } else {
-    FieldCell<Scal> l_fc_radiation(parallel->GetLocalMesh());
-    parallel->RecvLocal(l_fc_radiation, 0);
-    for (auto idxcell : parallel->GetLocalMesh().Cells()) {
-      l_fc_radiation[idxcell] += parallel->GetRank();
-    }
+  FieldCell<Scal> l_fc_radiation(parallel->GetLocalMesh(), rank);
+
+  if (rank == 1) {
+    parallel->SendOverlap(l_fc_radiation, 2);
+  } else if (rank == 2) {
+    parallel->RecvOverlap(l_fc_radiation, 1);
+  }
+
+  if (rank == 0) {
+    parallel->RecvExtLocal(fc_radiation, 2);
+  } else if (rank == 2) {
     parallel->SendLocal(l_fc_radiation, 0);
   }
 }
