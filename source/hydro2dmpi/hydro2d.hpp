@@ -44,6 +44,9 @@ geom::Vect<float, 2> GetVect<geom::Vect<float, 2>>(const column<double>& v);
 template <>
 geom::Vect<float, 3> GetVect<geom::Vect<float, 3>>(const column<double>& v);
 
+struct Flags {
+  bool no_output = false;
+};
 
 template <class Mesh>
 class hydro_core : public TModule
@@ -66,13 +69,9 @@ class hydro_core : public TModule
   using FieldFace = geom::FieldFace<T>;
   template <class T>
   using FieldNode = geom::FieldNode<T>;
+  Mesh& mesh;
+  Flags& flags;
 
-  struct Flags {
-    bool no_output = false;
-  };
-  Flags flags;
-
-  Mesh mesh;
   Mesh outmesh;
   FieldCell<IdxCell> out_to_mesh_;
   std::shared_ptr<solver::
@@ -109,10 +108,6 @@ class hydro_core : public TModule
   double last_frame_time_;
   double last_frame_scalar_time_;
 
-  // Parallel (MPI)
-  std::shared_ptr<solver::ParallelTools<Mesh>> parallel;
-  bool is_master, is_worker;
-
   const size_t num_phases;
   const geom::Range<size_t> phases;
   void UpdateFluidProperties();
@@ -120,8 +115,6 @@ class hydro_core : public TModule
   std::shared_ptr<const solver::LinearSolverFactory>
   GetLinearSolverFactory(std::string linear_name,
                          std::string first_prefix = "");
-  void InitMesh();
-  void InitParallel();
   void InitFluidSolver();
   void InitAdvectionSolver();
   void InitRadiation();
@@ -147,7 +140,7 @@ class hydro_core : public TModule
   FieldCell<T> GetSum(const std::vector<FieldCell<T>>& v_fc_field);
 
  public:
-  hydro_core(TExperiment* _ex);
+  hydro_core(TExperiment* _ex, Mesh& mesh, Flags& flags);
   ~hydro_core() {}
   void step();
   void write_results(bool force=false);
@@ -176,12 +169,22 @@ class hydro : public TModule
   template <class T>
   using FieldNode = geom::FieldNode<T>;
 
+  Mesh mesh;
+  Flags flags;
+  // Parallel (MPI)
+  std::shared_ptr<solver::ParallelTools<Mesh>> parallel;
+  bool is_master, is_worker;
+
   std::shared_ptr<hydro_core<Mesh>> hydro_core_;
+  void InitMesh();
+  void InitParallel();
 
  public:
   hydro(TExperiment* _ex)
       : TExperiment_ref(_ex), TModule(_ex) {
-    hydro_core_ = std::make_shared<hydro_core<Mesh>>(_ex);
+    InitMesh();
+    InitParallel();
+    hydro_core_ = std::make_shared<hydro_core<Mesh>>(_ex, mesh, flags);
   }
   ~hydro() {}
   void step() {
@@ -243,14 +246,14 @@ hydro_core<Mesh>::GetLinearSolverFactory(std::string linear_name,
 }
 
 template <class Mesh>
-void hydro_core<Mesh>::InitMesh() {
+void hydro<Mesh>::InitMesh() {
   MIdx mesh_size;
   for (size_t i = 0; i < dim; ++i) {
     mesh_size[i] = P_int[std::string("N") + Direction(i).GetLetter()];
   }
 
-  domain = geom::Rect<Vect>(GetVect<Vect>(P_vect["A"]),
-                            GetVect<Vect>(P_vect["B"]));
+  geom::Rect<Vect> domain(GetVect<Vect>(P_vect["A"]),
+                          GetVect<Vect>(P_vect["B"]));
 
   geom::InitUniformMesh(mesh, domain, mesh_size);
 
@@ -258,7 +261,7 @@ void hydro_core<Mesh>::InitMesh() {
 }
 
 template <class Mesh>
-void hydro_core<Mesh>::InitParallel() {
+void hydro<Mesh>::InitParallel() {
   parallel = std::make_shared<solver::ParallelTools<Mesh>>(mesh);
 
   is_master = (parallel->GetRank() == 0);
@@ -622,6 +625,8 @@ void hydro_core<Mesh>::InitOutput() {
                          Direction(i).GetLetter()];
   }
   MIdx mesh_size = mesh.GetBlockCells().GetDimensions();
+  geom::Rect<Vect> domain(GetVect<Vect>(P_vect["A"]),
+                          GetVect<Vect>(P_vect["B"]));
   geom::InitUniformMesh(outmesh, domain, mesh_size * output_factor);
   out_to_mesh_.Reinit(outmesh);
   for (auto outidx : outmesh.Cells()) {
@@ -813,8 +818,9 @@ void hydro_core<Mesh>::InitOutput() {
 }
 
 template <class Mesh>
-hydro_core<Mesh>::hydro_core(TExperiment* _ex)
+hydro_core<Mesh>::hydro_core(TExperiment* _ex, Mesh& mesh, Flags& flags)
     : TExperiment_ref(_ex), TModule(_ex)
+    , mesh(mesh), flags(flags)
     , num_phases(P_int["num_phases"])
     , phases(0, num_phases)
 {
@@ -830,8 +836,6 @@ hydro_core<Mesh>::hydro_core(TExperiment* _ex)
   P_int.set("current_frame", 0);
   P_int.set("current_frame_scalar", 0);
 
-  InitMesh();
-  InitParallel();
   InitFluidSolver();
   InitAdvectionSolver();
   InitRadiation();
@@ -1375,7 +1379,7 @@ void hydro_core<Mesh>::step() {
 
   ex->timer_.Pop();
 
-  int rank = parallel->GetRank();
+/*  int rank = parallel->GetRank();
 
   // Parallel test:
   FieldCell<Scal> l_fc_radiation(parallel->GetLocalMesh(), rank);
@@ -1390,12 +1394,11 @@ void hydro_core<Mesh>::step() {
     parallel->RecvExtLocal(fc_radiation, 2);
   } else if (rank == 2) {
     parallel->SendLocal(l_fc_radiation, 0);
-  }
+  }*/
 }
 
 template <class Mesh>
-void hydro_core<Mesh>::write_results(bool force)
-{
+void hydro_core<Mesh>::write_results(bool force) {
   if (flags.no_output) {
     return;
   }
