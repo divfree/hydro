@@ -44,8 +44,9 @@ geom::Vect<float, 2> GetVect<geom::Vect<float, 2>>(const column<double>& v);
 template <>
 geom::Vect<float, 3> GetVect<geom::Vect<float, 3>>(const column<double>& v);
 
+
 template <class Mesh>
-class hydro : public TModule
+class hydro_core : public TModule
 {
   static constexpr size_t dim = Mesh::dim;
 
@@ -110,6 +111,7 @@ class hydro : public TModule
 
   // Parallel (MPI)
   std::shared_ptr<solver::ParallelTools<Mesh>> parallel;
+  bool is_master, is_worker;
 
   const size_t num_phases;
   const geom::Range<size_t> phases;
@@ -145,15 +147,54 @@ class hydro : public TModule
   FieldCell<T> GetSum(const std::vector<FieldCell<T>>& v_fc_field);
 
  public:
-  hydro(TExperiment* _ex);
-  ~hydro() {}
+  hydro_core(TExperiment* _ex);
+  ~hydro_core() {}
   void step();
   void write_results(bool force=false);
 };
 
+
+template <class Mesh>
+class hydro : public TModule
+{
+  static constexpr size_t dim = Mesh::dim;
+
+  using Scal = typename Mesh::Scal;
+  using MIdx = typename Mesh::MIdx;
+  using Direction = typename Mesh::Direction;
+  using Vect = typename Mesh::Vect;
+
+  using IntIdx = geom::IntIdx;
+  using IdxCell = geom::IdxCell;
+  using IdxFace = geom::IdxFace;
+  using IdxNode = geom::IdxNode;
+
+  template <class T>
+  using FieldCell = geom::FieldCell<T>;
+  template <class T>
+  using FieldFace = geom::FieldFace<T>;
+  template <class T>
+  using FieldNode = geom::FieldNode<T>;
+
+  std::shared_ptr<hydro_core<Mesh>> hydro_core_;
+
+ public:
+  hydro(TExperiment* _ex)
+      : TExperiment_ref(_ex), TModule(_ex) {
+    hydro_core_ = std::make_shared<hydro_core<Mesh>>(_ex);
+  }
+  ~hydro() {}
+  void step() {
+    hydro_core_->step();
+  }
+  void write_results(bool force=false) {
+    hydro_core_->write_results(force);
+  }
+};
+
 template <class Mesh>
 std::shared_ptr<const solver::LinearSolverFactory>
-hydro<Mesh>::GetLinearSolverFactory(std::string linear_name,
+hydro_core<Mesh>::GetLinearSolverFactory(std::string linear_name,
                                     std::string /*first_prefix*/) {
   if (linear_name == "lu") {
     return std::make_shared<const solver::LinearSolverFactory>(
@@ -202,7 +243,7 @@ hydro<Mesh>::GetLinearSolverFactory(std::string linear_name,
 }
 
 template <class Mesh>
-void hydro<Mesh>::InitMesh() {
+void hydro_core<Mesh>::InitMesh() {
   MIdx mesh_size;
   for (size_t i = 0; i < dim; ++i) {
     mesh_size[i] = P_int[std::string("N") + Direction(i).GetLetter()];
@@ -217,16 +258,18 @@ void hydro<Mesh>::InitMesh() {
 }
 
 template <class Mesh>
-void hydro<Mesh>::InitParallel() {
+void hydro_core<Mesh>::InitParallel() {
   parallel = std::make_shared<solver::ParallelTools<Mesh>>(mesh);
 
-  if (parallel->GetRank() > 0) { // Not master
+  is_master = (parallel->GetRank() == 0);
+  is_worker = !is_master;
+  if (is_worker) {
     flags.no_output = true;
   }
 }
 
 template <class Mesh>
-void hydro<Mesh>::InitFluidSolver() {
+void hydro_core<Mesh>::InitFluidSolver() {
   // Parse linear solver parameters
   std::shared_ptr<const solver::LinearSolverFactory>
   p_linear_factory_velocity =
@@ -381,7 +424,7 @@ void hydro<Mesh>::InitFluidSolver() {
 }
 
 template <class Mesh>
-void hydro<Mesh>::InitAdvectionSolver() {
+void hydro_core<Mesh>::InitAdvectionSolver() {
   // Properties of phases
   v_true_density = GetPhaseProperty("density_");
   v_viscosity = GetPhaseProperty("viscosity_");
@@ -495,7 +538,7 @@ void hydro<Mesh>::InitAdvectionSolver() {
 }
 
 template <class Mesh>
-void hydro<Mesh>::InitRadiation() {
+void hydro_core<Mesh>::InitRadiation() {
   // Boundary conditions for radiation
   Vect radiation_box_lb = GetVect<Vect>(P_vect["radiation_box_lb"]);
   Vect radiation_box_rt = GetVect<Vect>(P_vect["radiation_box_rt"]);
@@ -529,7 +572,7 @@ void hydro<Mesh>::InitRadiation() {
 }
 
 template <class Mesh>
-void hydro<Mesh>::InitHeatSolver() {
+void hydro_core<Mesh>::InitHeatSolver() {
   std::shared_ptr<const solver::LinearSolverFactory>
   p_linear_factory_heat =
       GetLinearSolverFactory(P_string["linear_solver_heat"], "heat_");
@@ -567,7 +610,7 @@ void hydro<Mesh>::InitHeatSolver() {
 }
 
 template <class Mesh>
-void hydro<Mesh>::InitOutput() {
+void hydro_core<Mesh>::InitOutput() {
   if (flags.no_output) {
     return;
   }
@@ -770,7 +813,7 @@ void hydro<Mesh>::InitOutput() {
 }
 
 template <class Mesh>
-hydro<Mesh>::hydro(TExperiment* _ex)
+hydro_core<Mesh>::hydro_core(TExperiment* _ex)
     : TExperiment_ref(_ex), TModule(_ex)
     , num_phases(P_int["num_phases"])
     , phases(0, num_phases)
@@ -814,7 +857,7 @@ void Limit(Scal& source, Scal concentration, Scal density, Scal dt) {
 }
 
 template <class Mesh>
-void hydro<Mesh>::CalcPhasesVolumeFraction() {
+void hydro_core<Mesh>::CalcPhasesVolumeFraction() {
   // Calc and normalize volume fraction for phases
   for (auto idxcell : mesh.Cells()) {
     Scal sum = 0.;
@@ -828,7 +871,7 @@ void hydro<Mesh>::CalcPhasesVolumeFraction() {
 }
 
 template <class Mesh>
-auto hydro<Mesh>::GetPhaseProperty(std::string name) -> std::vector<Scal> {
+auto hydro_core<Mesh>::GetPhaseProperty(std::string name) -> std::vector<Scal> {
   std::vector<Scal> v_property(num_phases);
   for (auto i : phases) {
     v_property[i] = P_double[name + IntToStr(i)];
@@ -837,7 +880,7 @@ auto hydro<Mesh>::GetPhaseProperty(std::string name) -> std::vector<Scal> {
 }
 
 template <class Mesh>
-auto hydro<Mesh>::GetPhaseProperty(std::string name,
+auto hydro_core<Mesh>::GetPhaseProperty(std::string name,
                                    const std::vector<bool>& v_enabled)
     -> std::vector<Scal> {
   std::vector<Scal> v_property(num_phases, 0);
@@ -850,7 +893,7 @@ auto hydro<Mesh>::GetPhaseProperty(std::string name,
 }
 
 template <class Mesh>
-auto hydro<Mesh>::GetPhasePropertyFlag(std::string name) -> std::vector<bool> {
+auto hydro_core<Mesh>::GetPhasePropertyFlag(std::string name) -> std::vector<bool> {
   std::vector<bool> v_property(num_phases);
   for (auto i : phases) {
     v_property[i] = flag(name + IntToStr(i));
@@ -859,7 +902,7 @@ auto hydro<Mesh>::GetPhasePropertyFlag(std::string name) -> std::vector<bool> {
 }
 
 template <class Mesh>
-void hydro<Mesh>::CalcPhaseVelocitySlip() {
+void hydro_core<Mesh>::CalcPhaseVelocitySlip() {
   Vect gravity = GetVect<Vect>(P_vect["gravity"]);
   auto v_enable_settling = GetPhasePropertyFlag("enable_settling_");
   auto v_bubble_radius = GetPhaseProperty("bubble_radius_", v_enable_settling);
@@ -956,7 +999,7 @@ void hydro<Mesh>::CalcPhaseVelocitySlip() {
 // Allow one to specify attributes like REQUIRE(pressure)
 
 template <class Mesh>
-void hydro<Mesh>::CalcPhasesTrueDensity() {
+void hydro_core<Mesh>::CalcPhasesTrueDensity() {
   if (P_bool["compressible_enable"]) {
     // Calc target density
     for (auto i : phases) {
@@ -987,7 +1030,7 @@ void hydro<Mesh>::CalcPhasesTrueDensity() {
 }
 
 template <class Mesh>
-void hydro<Mesh>::CalcPhasesMassSource() {
+void hydro_core<Mesh>::CalcPhasesMassSource() {
   std::vector<Scal> v_molar_mass = GetPhaseProperty("molar_");
   std::shared_ptr<solver::Kinetics<Mesh>> chem_solver;
 
@@ -1051,7 +1094,7 @@ void hydro<Mesh>::CalcPhasesMassSource() {
 
 template <class Mesh>
 template <class T>
-auto hydro<Mesh>::GetVolumeAveraged(
+auto hydro_core<Mesh>::GetVolumeAveraged(
     const std::vector<FieldCell<T>>& v_fc_field) -> FieldCell<T> {
   FieldCell<T> res(mesh, T(0));
   for (auto i : phases) {
@@ -1064,7 +1107,7 @@ auto hydro<Mesh>::GetVolumeAveraged(
 }
 
 template <class Mesh>
-auto hydro<Mesh>::GetVolumeAveraged(
+auto hydro_core<Mesh>::GetVolumeAveraged(
     const std::vector<Scal>& v_value) -> FieldCell<Scal> {
   FieldCell<Scal> res(mesh, 0);
   for (auto i : phases) {
@@ -1078,7 +1121,7 @@ auto hydro<Mesh>::GetVolumeAveraged(
 
 template <class Mesh>
 template <class T>
-auto hydro<Mesh>::GetSum(
+auto hydro_core<Mesh>::GetSum(
     const std::vector<FieldCell<T>>& v_fc_field) -> FieldCell<T> {
   FieldCell<T> res(mesh, T(0));
   for (auto i : phases) {
@@ -1092,7 +1135,7 @@ auto hydro<Mesh>::GetSum(
 // TODO: Split templates into files
 
 template<class Mesh>
-void hydro<Mesh>::AppendAntidiffusionVolumeFlux() {
+void hydro_core<Mesh>::AppendAntidiffusionVolumeFlux() {
   if (double* factor = P_double("antidiffusion_factor")) {
     std::vector<geom::FieldCell<Vect> > v_fc_antidiffusion(num_phases);
     Scal antidiffusion_factor = *factor;
@@ -1120,7 +1163,7 @@ void hydro<Mesh>::AppendAntidiffusionVolumeFlux() {
 }
 
 template<class Mesh>
-void hydro<Mesh>::CalcRadiation() {
+void hydro_core<Mesh>::CalcRadiation() {
   // Calc radiation field
   if (flag("radiation_enable")) {
     Vect radiation_direction = GetVect<Vect>(P_vect["radiation_direction"]);
@@ -1137,7 +1180,7 @@ void hydro<Mesh>::CalcRadiation() {
 }
 
 template<class Mesh>
-void hydro<Mesh>::CalcForce() {
+void hydro_core<Mesh>::CalcForce() {
   Vect gravity = GetVect<Vect>(P_vect["gravity"]);
   fc_force.Reinit(mesh);
   for (auto idxcell : mesh.Cells()) {
@@ -1148,7 +1191,7 @@ void hydro<Mesh>::CalcForce() {
 }
 
 template<class Mesh>
-void hydro<Mesh>::CalcMixtureVolumeSource() {
+void hydro_core<Mesh>::CalcMixtureVolumeSource() {
   fc_volume_source.Reinit(mesh, 0.);
   for (auto idxcell : mesh.Cells()) {
     for (auto i : phases) {
@@ -1174,7 +1217,7 @@ void hydro<Mesh>::CalcMixtureVolumeSource() {
 // TODO: Make alias v_fc_density for advection_solver->GetField(i)
 
 template <class Mesh>
-void hydro<Mesh>::UpdateFluidProperties() {
+void hydro_core<Mesh>::UpdateFluidProperties() {
   CalcPhasesTrueDensity();
   CalcPhasesVolumeFraction();
   CalcPhasesMassSource();
@@ -1202,7 +1245,7 @@ void hydro<Mesh>::UpdateFluidProperties() {
 }
 
 template <class Mesh>
-void hydro<Mesh>::CalcStat() {
+void hydro_core<Mesh>::CalcStat() {
   for (auto i : phases) {
     Scal density = v_true_density[i];
     Scal volume = 0.;
@@ -1253,7 +1296,7 @@ void hydro<Mesh>::CalcStat() {
 }
 
 template <class Mesh>
-void hydro<Mesh>::step() {
+void hydro_core<Mesh>::step() {
   ex->timer_.Push("step");
 
   ex->timer_.Push("step.fluid");
@@ -1351,7 +1394,7 @@ void hydro<Mesh>::step() {
 }
 
 template <class Mesh>
-void hydro<Mesh>::write_results(bool force)
+void hydro_core<Mesh>::write_results(bool force)
 {
   if (flags.no_output) {
     return;
