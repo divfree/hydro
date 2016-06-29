@@ -110,6 +110,7 @@ class hydro_core : public TModule
 
   const size_t num_phases;
   const geom::Range<size_t> phases;
+
   void UpdateFluidProperties();
   void CalcStat();
   std::shared_ptr<const solver::LinearSolverFactory>
@@ -140,9 +141,14 @@ class hydro_core : public TModule
   FieldCell<T> GetSum(const std::vector<FieldCell<T>>& v_fc_field);
 
  public:
+  enum class OutputFieldName {
+    fc_velocity_x, fc_velocity_y, fc_velocity_z
+  };
+
   hydro_core(TExperiment* _ex, Mesh& mesh, Flags& flags);
   ~hydro_core() {}
   void step();
+  FieldCell<Scal> GetField(OutputFieldName) const;
   void write_results(bool force=false);
 };
 
@@ -176,6 +182,11 @@ class hydro : public TModule
   bool is_master, is_worker;
 
   std::shared_ptr<hydro_core<Mesh>> hydro_core_;
+  using OutputFieldName = typename hydro_core<Mesh>::OutputFieldName;
+  using OutputFieldRefs = std::map<OutputFieldName, FieldCell<Scal>*>;
+  OutputFieldRefs output_field_refs_;
+  std::map<OutputFieldName, FieldCell<Scal>> output_fields_;
+
   void InitMesh();
   void InitParallel();
 
@@ -185,12 +196,26 @@ class hydro : public TModule
     InitMesh();
     InitParallel();
     hydro_core_ = std::make_shared<hydro_core<Mesh>>(_ex, mesh, flags);
+
+    output_field_refs_[OutputFieldName::fc_velocity_x] = nullptr;
+    output_field_refs_[OutputFieldName::fc_velocity_y] = nullptr;
+    output_field_refs_[OutputFieldName::fc_velocity_z] = nullptr;
+
+    for (auto it = output_field_refs_.begin();
+        it != output_field_refs_.end(); ++it) {
+      it->second = &output_fields_.emplace(it->first, mesh).first->second;
+    }
   }
   ~hydro() {}
   void step() {
     hydro_core_->step();
   }
   void write_results(bool force=false) {
+    for (auto it = output_field_refs_.begin();
+        it != output_field_refs_.end(); ++it) {
+      (*it->second) = hydro_core_->GetField(it->first);
+    }
+
     hydro_core_->write_results(force);
   }
 };
@@ -1395,6 +1420,24 @@ void hydro_core<Mesh>::step() {
   } else if (rank == 2) {
     parallel->SendLocal(l_fc_radiation, 0);
   }*/
+}
+
+template <class Mesh>
+auto hydro_core<Mesh>::GetField(OutputFieldName field_name) const
+-> FieldCell<Scal> {
+  switch (field_name) {
+    case OutputFieldName::fc_velocity_x: {
+      return geom::GetComponent(fluid_solver->GetVelocity(), 0);
+    }
+    case OutputFieldName::fc_velocity_y: {
+      return geom::GetComponent(fluid_solver->GetVelocity(), 1);
+    }
+    case OutputFieldName::fc_velocity_z: {
+      return geom::GetComponent(fluid_solver->GetVelocity(), 2);
+    }
+    default:
+      throw std::runtime_error("Unknown field name");
+  }
 }
 
 template <class Mesh>
