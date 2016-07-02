@@ -38,7 +38,7 @@ class ParallelTools {
   int current_rank_;
   std::vector<Processor> v_processor_;
   void InitLocalMesh(const Mesh& global_mesh_, int rank,
-                       int overlap_width = 2) {
+                       int overlap_width = 0) {
     using MIdx = typename Mesh::MIdx;
     using Rect = geom::Rect<MIdx>;
     using BlockNodes = typename Mesh::BlockNodes;
@@ -167,6 +167,9 @@ class ParallelTools {
   }
   const Processor& GetProcessor(int rank) const {
     return v_processor_[rank];
+  }
+  const Processor& GetProcessor() const {
+    return v_processor_[current_rank_];
   }
   void SendLocal(const geom::FieldCell<Scal>& fc_local, int dest) {
     if (dest == current_rank_) {

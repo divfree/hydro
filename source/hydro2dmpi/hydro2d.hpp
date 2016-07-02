@@ -102,7 +102,9 @@ class hydro_core : public TModule
   using FieldFace = geom::FieldFace<T>;
   template <class T>
   using FieldNode = geom::FieldNode<T>;
-  Mesh& mesh;
+  const typename solver::ParallelTools<Mesh>::Processor& processor_;
+  const Mesh& global_mesh;
+  const Mesh& mesh;
   Flags& flags;
 
   std::shared_ptr<solver::
@@ -174,7 +176,9 @@ class hydro_core : public TModule
     fc_velocity_x, fc_velocity_y, fc_velocity_z
   };
 
-  hydro_core(TExperiment* _ex, Mesh& mesh, Flags& flags);
+  hydro_core(TExperiment* _ex, const Mesh& global_mesh,
+             const typename solver::ParallelTools<Mesh>::Processor& processor,
+             Flags& flags);
   ~hydro_core() {}
   void step();
   FieldCell<Scal> GetField(OutputFieldName) const;
@@ -243,7 +247,8 @@ class hydro : public TModule
     InitOutput();
 
     if (is_worker) {
-      hydro_core_ = std::make_shared<hydro_core<Mesh>>(_ex, mesh, flags);
+      hydro_core_ = std::make_shared<
+          hydro_core<Mesh>>(_ex, mesh, parallel->GetProcessor(), flags);
     }
 
     if (!flags.no_field_output) {
@@ -558,31 +563,37 @@ void hydro_core<Mesh>::InitFluidSolver() {
       GetLinearSolverFactory(P_string["linear_solver_pressure"], "pressure_");
 
   auto is_left_boundary = [this](IdxFace idxface) {
-    return mesh.GetDirection(idxface) == Direction::i &&
-        mesh.GetBlockFaces().GetMIdx(idxface)[0] == 0;
+    auto g_idxface = processor_.ff_origin[idxface];
+    return global_mesh.GetDirection(g_idxface) == Direction::i &&
+        global_mesh.GetBlockFaces().GetMIdx(g_idxface)[0] == 0;
   };
   auto is_right_boundary = [this](IdxFace idxface) {
-    return mesh.GetDirection(idxface) == Direction::i &&
-        mesh.GetBlockFaces().GetMIdx(idxface)[0] ==
-            mesh.GetBlockCells().GetDimensions()[0];
+    auto g_idxface = processor_.ff_origin[idxface];
+    return global_mesh.GetDirection(g_idxface) == Direction::i &&
+        global_mesh.GetBlockFaces().GetMIdx(g_idxface)[0] ==
+            global_mesh.GetBlockCells().GetDimensions()[0];
   };
   auto is_bottom_boundary = [this](IdxFace idxface) {
-    return mesh.GetDirection(idxface) == Direction::j &&
-        mesh.GetBlockFaces().GetMIdx(idxface)[1] == 0;
+    auto g_idxface = processor_.ff_origin[idxface];
+    return global_mesh.GetDirection(g_idxface) == Direction::j &&
+        global_mesh.GetBlockFaces().GetMIdx(g_idxface)[1] == 0;
   };
   auto is_top_boundary = [this](IdxFace idxface) {
-    return mesh.GetDirection(idxface) == Direction::j &&
-        mesh.GetBlockFaces().GetMIdx(idxface)[1] ==
-            mesh.GetBlockCells().GetDimensions()[1];
+    auto g_idxface = processor_.ff_origin[idxface];
+    return global_mesh.GetDirection(g_idxface) == Direction::j &&
+        global_mesh.GetBlockFaces().GetMIdx(g_idxface)[1] ==
+            global_mesh.GetBlockCells().GetDimensions()[1];
   };
   auto is_close_boundary = [this](IdxFace idxface) {
-    return dim == 3 && mesh.GetDirection(idxface) == Direction::k &&
-        mesh.GetBlockFaces().GetMIdx(idxface)[2] == 0;
+    auto g_idxface = processor_.ff_origin[idxface];
+    return dim == 3 && global_mesh.GetDirection(g_idxface) == Direction::k &&
+        global_mesh.GetBlockFaces().GetMIdx(g_idxface)[2] == 0;
   };
   auto is_far_boundary = [this](IdxFace idxface) {
-    return dim == 3 && mesh.GetDirection(idxface) == Direction::k &&
-        mesh.GetBlockFaces().GetMIdx(idxface)[2] ==
-            mesh.GetBlockCells().GetDimensions()[2];
+    auto g_idxface = processor_.ff_origin[idxface];
+    return dim == 3 && global_mesh.GetDirection(g_idxface) == Direction::k &&
+        global_mesh.GetBlockFaces().GetMIdx(g_idxface)[2] ==
+            global_mesh.GetBlockCells().GetDimensions()[2];
   };
 
   // Rigid box
@@ -621,7 +632,9 @@ void hydro_core<Mesh>::InitFluidSolver() {
         fluid_cond[idxface] =
             solver::Parse(P_string["condition_far"], idxface, mesh);
       } else {
-        throw std::runtime_error("Unhandled boundary");
+        fluid_cond[idxface] =
+            solver::Parse(P_string["condition_left"], idxface, mesh);
+        // throw std::runtime_error("Unhandled boundary");
       }
     } else {
       // Rigid box boundary conditions
@@ -645,7 +658,7 @@ void hydro_core<Mesh>::InitFluidSolver() {
       exclusion_list.push_back(idxcell);
     }
   }
-  mesh.ExcludeCells(exclusion_list);
+  const_cast<Mesh&>(mesh).ExcludeCells(exclusion_list);
 
   // Remove conditions on excluded boundaries
   for (auto idxface : mesh.Faces()) {
@@ -943,9 +956,13 @@ void hydro_core<Mesh>::InitOutput() {
 }
 
 template <class Mesh>
-hydro_core<Mesh>::hydro_core(TExperiment* _ex, Mesh& mesh, Flags& flags)
+hydro_core<Mesh>::hydro_core(
+    TExperiment* _ex, const Mesh& global_mesh,
+    const typename solver::ParallelTools<Mesh>::Processor& processor,
+    Flags& flags)
     : TExperiment_ref(_ex), TModule(_ex)
-    , mesh(mesh), flags(flags)
+    , processor_(processor), global_mesh(global_mesh)
+    , mesh(processor.mesh), flags(flags)
     , num_phases(P_int["num_phases"])
     , phases(0, num_phases)
 {
