@@ -209,6 +209,7 @@ class hydro : public TModule
   // Parallel (MPI)
   std::shared_ptr<solver::ParallelTools<Mesh>> parallel;
   bool is_master, is_worker;
+  int rank_;
 
   std::shared_ptr<hydro_core<Mesh>> hydro_core_;
   using OutputFieldName = typename hydro_core<Mesh>::OutputFieldName;
@@ -229,10 +230,21 @@ class hydro : public TModule
  public:
   hydro(TExperiment* _ex)
       : TExperiment_ref(_ex), TModule(_ex) {
+    P_int.set("last_s", 0);
+    P_double.set("last_R", 0);
+    P_double.set("last_Rn", 0);
+
+    P_int.set("s_sum", 0);
+    P_int.set("s_max", 0);
+    P_int.set("s", 0);
+
     InitMesh();
     InitParallel();
     InitOutput();
-    hydro_core_ = std::make_shared<hydro_core<Mesh>>(_ex, mesh, flags);
+
+    if (is_worker) {
+      hydro_core_ = std::make_shared<hydro_core<Mesh>>(_ex, mesh, flags);
+    }
 
     if (!flags.no_field_output) {
       output_field_refs_[OutputFieldName::fc_velocity_x] = nullptr;
@@ -251,29 +263,38 @@ class hydro : public TModule
   }
   ~hydro() {}
   void step() {
-    hydro_core_->step();
+    if (is_worker) {
+      hydro_core_->step();
+    }
   }
   void write_results(bool force=false) {
-    MPI_Barrier(MPI_COMM_WORLD);
     if (!flags.no_field_output) {
-      for (auto it = output_field_refs_.begin();
-          it != output_field_refs_.end(); ++it) {
-        (*it->second) = hydro_core_->GetField(it->first);
+      if (rank_ == 0) {
+        for (auto it = output_field_refs_.begin();
+            it != output_field_refs_.end(); ++it) {
+          parallel->RecvGlobal(*it->second);
+        }
+
+        const double time = P_double["t"];
+        const double total_time = P_double["T"];
+        const size_t max_frame_index = P_int["max_frame_index"];
+        const double frame_duration = total_time / max_frame_index;
+
+        if (force || (!ecast(P_bool("no_mesh_output")) &&
+            time >= last_frame_time_ + frame_duration)) {
+          last_frame_time_ = time;
+          session->Write(time, P_string[_plt_title] + ":" + IntToStr(P_int["n"]));
+          logger() << "Frame " << (P_int["current_frame"]++) << ": t=" << time;
+        }
+
+        //hydro_core_->write_results(force);
+      } else {
+        for (auto it = output_field_refs_.begin();
+            it != output_field_refs_.end(); ++it) {
+          (*it->second) = hydro_core_->GetField(it->first);
+          parallel->SendLocal(*it->second, 0);
+        }
       }
-
-      const double time = P_double["t"];
-      const double total_time = P_double["T"];
-      const size_t max_frame_index = P_int["max_frame_index"];
-      const double frame_duration = total_time / max_frame_index;
-
-      if (force || (!ecast(P_bool("no_mesh_output")) &&
-          time >= last_frame_time_ + frame_duration)) {
-        last_frame_time_ = time;
-        session->Write(time, P_string[_plt_title] + ":" + IntToStr(P_int["n"]));
-        logger() << "Frame " << (P_int["current_frame"]++) << ": t=" << time;
-      }
-
-      hydro_core_->write_results(force);
     }
   }
 };
@@ -346,12 +367,13 @@ void hydro<Mesh>::InitMesh() {
 template <class Mesh>
 void hydro<Mesh>::InitParallel() {
   parallel = std::make_shared<solver::ParallelTools<Mesh>>(mesh);
+  rank_ = parallel->GetRank();
 
-  is_master = (parallel->GetRank() == 0);
+  is_master = (rank_ == 0);
   is_worker = !is_master;
   flags.no_output = P_bool["no_output"];
   if (is_worker) {
-    flags.no_output = true;
+    flags.no_scalar_output = true;
   }
 }
 
@@ -365,7 +387,9 @@ void hydro<Mesh>::InitOutput() {
     flags.no_scalar_output = false;
   }
 
-  if (!flags.no_field_output) {
+  if (!flags.no_field_output && rank_ == 0) {
+    P_int.set("current_frame", 0);
+
     // Create output mesh
     MIdx output_factor;
     for (size_t i = 0; i < dim; ++i) {
@@ -925,14 +949,6 @@ hydro_core<Mesh>::hydro_core(TExperiment* _ex, Mesh& mesh, Flags& flags)
     , num_phases(P_int["num_phases"])
     , phases(0, num_phases)
 {
-  P_int.set("last_s", 0);
-  P_double.set("last_R", 0);
-  P_double.set("last_Rn", 0);
-
-  P_int.set("s_sum", 0);
-  P_int.set("s_max", 0);
-  P_int.set("s", 0);
-  P_int.set("current_frame", 0);
   P_int.set("current_frame_scalar", 0);
 
   InitFluidSolver();
