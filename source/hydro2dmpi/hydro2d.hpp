@@ -29,6 +29,37 @@
 namespace hydro2D_uniform_MPI
 {
 
+class SmartBool {
+  bool is_defined_;
+  bool flag_;
+ public:
+  SmartBool()
+      : is_defined_(false) {}
+  SmartBool(bool flag)
+      : is_defined_(true),
+        flag_(flag) {}
+  SmartBool(const SmartBool& other) = default;
+  ~SmartBool() = default;
+  SmartBool& operator=(const SmartBool& other) = default;
+  SmartBool& operator=(bool flag) {
+    is_defined_ = true;
+    flag_ = flag;
+    return *this;
+  }
+  void Reset() {
+    is_defined_ = false;
+  }
+  bool IsDefined() const {
+    return is_defined_;
+  }
+  operator bool() const {
+    if (!is_defined_) {
+      throw std::runtime_error("SmartBool is undefined");
+    }
+    return flag_;
+  }
+};
+
 template <class Vect>
 Vect GetVect(const column<double>& v);
 
@@ -45,7 +76,9 @@ template <>
 geom::Vect<float, 3> GetVect<geom::Vect<float, 3>>(const column<double>& v);
 
 struct Flags {
-  bool no_output = false;
+  SmartBool no_output = false;
+  SmartBool no_scalar_output;
+  SmartBool no_field_output;
 };
 
 template <class Mesh>
@@ -72,16 +105,14 @@ class hydro_core : public TModule
   Mesh& mesh;
   Flags& flags;
 
-  Mesh outmesh;
-  FieldCell<IdxCell> out_to_mesh_;
   std::shared_ptr<solver::
   FluidSolver<Mesh>> fluid_solver;
   std::shared_ptr<solver::
   AdvectionSolverMulti<Mesh, FieldFace<Scal>>> advection_solver;
   std::shared_ptr<solver::
   HeatSolver<Mesh>> heat_solver;
-  output::Content content, content_scalar;
-  std::shared_ptr<output::Session> session, session_scalar;
+  output::Content content_scalar;
+  std::shared_ptr<output::Session> session_scalar;
   FieldCell<Scal> fc_density, fc_density_smooth, fc_viscosity_smooth;
   FieldCell<Scal> fc_volume_source, fc_mass_source;
   std::vector<Scal> v_true_density, v_viscosity, v_conductivity;
@@ -101,11 +132,9 @@ class hydro_core : public TModule
   v_mf_partial_density_cond_;
   // TODO: GetBoundaryConditions() in solvers
   geom::MapFace<solver::ConditionFace*> mf_cond_radiation;
-  geom::Rect<Vect> domain;
   geom::MapFace<std::shared_ptr<solver::ConditionFaceFluid>> fluid_cond;
   FieldCell<Scal> fc_conductivity, fc_temperature_source;
 
-  double last_frame_time_;
   double last_frame_scalar_time_;
 
   const size_t num_phases;
@@ -187,23 +216,37 @@ class hydro : public TModule
   OutputFieldRefs output_field_refs_;
   std::map<OutputFieldName, FieldCell<Scal>> output_fields_;
 
+  Mesh outmesh;
+  FieldCell<IdxCell> out_to_mesh_;
+  double last_frame_time_;
+  output::Content content;
+  std::shared_ptr<output::Session> session;
+
   void InitMesh();
   void InitParallel();
+  void InitOutput();
 
  public:
   hydro(TExperiment* _ex)
       : TExperiment_ref(_ex), TModule(_ex) {
     InitMesh();
     InitParallel();
+    InitOutput();
     hydro_core_ = std::make_shared<hydro_core<Mesh>>(_ex, mesh, flags);
 
-    output_field_refs_[OutputFieldName::fc_velocity_x] = nullptr;
-    output_field_refs_[OutputFieldName::fc_velocity_y] = nullptr;
-    output_field_refs_[OutputFieldName::fc_velocity_z] = nullptr;
+    if (!flags.no_field_output) {
+      output_field_refs_[OutputFieldName::fc_velocity_x] = nullptr;
+      output_field_refs_[OutputFieldName::fc_velocity_y] = nullptr;
+      output_field_refs_[OutputFieldName::fc_velocity_z] = nullptr;
 
-    for (auto it = output_field_refs_.begin();
-        it != output_field_refs_.end(); ++it) {
-      it->second = &output_fields_.emplace(it->first, mesh).first->second;
+      for (auto it = output_field_refs_.begin();
+          it != output_field_refs_.end(); ++it) {
+        it->second = &output_fields_.emplace(it->first, mesh).first->second;
+      }
+
+      if (P_int["max_frame_index"] > 0) {
+        session->Write(0., P_string[_plt_title] + ":0");
+      }
     }
   }
   ~hydro() {}
@@ -211,12 +254,27 @@ class hydro : public TModule
     hydro_core_->step();
   }
   void write_results(bool force=false) {
-    for (auto it = output_field_refs_.begin();
-        it != output_field_refs_.end(); ++it) {
-      (*it->second) = hydro_core_->GetField(it->first);
-    }
+    MPI_Barrier(MPI_COMM_WORLD);
+    if (!flags.no_field_output) {
+      for (auto it = output_field_refs_.begin();
+          it != output_field_refs_.end(); ++it) {
+        (*it->second) = hydro_core_->GetField(it->first);
+      }
 
-    hydro_core_->write_results(force);
+      const double time = P_double["t"];
+      const double total_time = P_double["T"];
+      const size_t max_frame_index = P_int["max_frame_index"];
+      const double frame_duration = total_time / max_frame_index;
+
+      if (force || (!ecast(P_bool("no_mesh_output")) &&
+          time >= last_frame_time_ + frame_duration)) {
+        last_frame_time_ = time;
+        session->Write(time, P_string[_plt_title] + ":" + IntToStr(P_int["n"]));
+        logger() << "Frame " << (P_int["current_frame"]++) << ": t=" << time;
+      }
+
+      hydro_core_->write_results(force);
+    }
   }
 };
 
@@ -291,10 +349,178 @@ void hydro<Mesh>::InitParallel() {
 
   is_master = (parallel->GetRank() == 0);
   is_worker = !is_master;
+  flags.no_output = P_bool["no_output"];
   if (is_worker) {
     flags.no_output = true;
   }
 }
+
+template <class Mesh>
+void hydro<Mesh>::InitOutput() {
+  if (flags.no_output) {
+    flags.no_field_output = true;
+    flags.no_scalar_output = true;
+  } else {
+    flags.no_field_output = false;
+    flags.no_scalar_output = false;
+  }
+
+  if (!flags.no_field_output) {
+    // Create output mesh
+    MIdx output_factor;
+    for (size_t i = 0; i < dim; ++i) {
+      output_factor[i] = P_int[std::string("output_factor_") +
+                           Direction(i).GetLetter()];
+    }
+    MIdx mesh_size = mesh.GetBlockCells().GetDimensions();
+    geom::Rect<Vect> domain(GetVect<Vect>(P_vect["A"]),
+                            GetVect<Vect>(P_vect["B"]));
+    geom::InitUniformMesh(outmesh, domain, mesh_size * output_factor);
+    out_to_mesh_.Reinit(outmesh);
+    for (auto outidx : outmesh.Cells()) {
+      MIdx outmidx = outmesh.GetBlockCells().GetMIdx(outidx);
+      out_to_mesh_[outidx] =
+          mesh.GetBlockCells().GetIdx(outmidx / output_factor);
+    }
+
+    // TODO: EntryFunctionField
+    output::Content content_pool = {
+        std::make_shared<output::EntryFunction<Scal, IdxNode, Mesh>>(
+            "x", outmesh, [this](IdxNode idx) { return outmesh.GetNode(idx)[0]; })
+        , std::make_shared<output::EntryFunction<Scal, IdxNode, Mesh>>(
+            "y", outmesh, [this](IdxNode idx) { return outmesh.GetNode(idx)[1]; })
+        , std::make_shared<output::EntryFunction<Scal, IdxNode, Mesh>>(
+            "z", outmesh, [this](IdxNode idx) {
+                return dim == 2 ? 0. : outmesh.GetNode(idx)[2]; })
+        , std::make_shared<output::EntryFunction<Scal, IdxCell, Mesh>>(
+            "velocity_x", outmesh, [this](IdxCell idx) {
+                return output_fields_[OutputFieldName::fc_velocity_x]
+                    [out_to_mesh_[idx]]; })
+        , std::make_shared<output::EntryFunction<Scal, IdxCell, Mesh>>(
+            "velocity_y", outmesh, [this](IdxCell idx) {
+                return output_fields_[OutputFieldName::fc_velocity_y]
+                                      [out_to_mesh_[idx]]; })
+        , std::make_shared<output::EntryFunction<Scal, IdxCell, Mesh>>(
+            "velocity_z", outmesh, [this](IdxCell idx) {
+                return dim == 2 ? 0. :
+                    output_fields_[OutputFieldName::fc_velocity_z]
+                                      [out_to_mesh_[idx]]; })
+       /* , std::make_shared<output::EntryFunction<Scal, IdxCell, Mesh>>(
+            "pressure", outmesh, [this](IdxCell idx) {
+                return fluid_solver->GetPressure()[out_to_mesh_[idx]]; })
+        , std::make_shared<output::EntryFunction<Scal, IdxCell, Mesh>>(
+            "density", outmesh, [this](IdxCell idx) {
+                return fc_density[out_to_mesh_[idx]]; })
+        , std::make_shared<output::EntryFunction<Scal, IdxCell, Mesh>>(
+            "viscosity", outmesh, [this](IdxCell idx) {
+                return fc_viscosity_smooth[out_to_mesh_[idx]]; })
+        , std::make_shared<output::EntryFunction<Scal, IdxCell, Mesh>>(
+            "radiation", outmesh, [this](IdxCell idx) {
+                return fc_radiation[out_to_mesh_[idx]]; })
+        , std::make_shared<output::EntryFunction<Scal, IdxCell, Mesh>>(
+            "volume_source", outmesh, [this](IdxCell idx) {
+                return fc_volume_source[out_to_mesh_[idx]]; })
+        , std::make_shared<output::EntryFunction<Scal, IdxCell, Mesh>>(
+            "temperature", outmesh, [this](IdxCell idx) {
+                return heat_solver->GetTemperature()[out_to_mesh_[idx]]; })
+        , std::make_shared<output::EntryFunction<Scal, IdxCell, Mesh>>(
+            "excluded", outmesh, [this](IdxCell idx) {
+                return mesh.IsExcluded(out_to_mesh_[idx]) ? 1. : 0.; })
+        , std::make_shared<output::EntryFunction<Scal, IdxCell, Mesh>>(
+            "divergence", outmesh, [this](IdxCell idx) {
+                auto idxcell = out_to_mesh_[idx];
+                Scal sum = 0.;
+                for (size_t i = 0; i < mesh.GetNumNeighbourFaces(idxcell); ++i) {
+                  sum += fluid_solver->
+                      GetVolumeFlux()[mesh.GetNeighbourFace(idxcell, i)] *
+                      mesh.GetOutwardFactor(idxcell, i);
+                }
+                return sum / mesh.GetVolume(idxcell);})*/
+    };
+  /*
+    // Mass source output field
+    for (auto i : phases) {
+      std::string phase = IntToStr(i);
+      content_pool.push_back(
+          std::make_shared<output::EntryFunction<Scal, IdxCell, Mesh>>(
+                  "mass_source_" + phase, outmesh, [this, i](IdxCell idx) {
+                      return v_fc_mass_source[i][out_to_mesh_[idx]]; }));
+    }
+
+    // Mass fraction output field
+    for (auto i : phases) {
+      std::string phase = IntToStr(i);
+      content_pool.push_back(
+          std::make_shared<output::EntryFunction<Scal, IdxCell, Mesh>>(
+              "mass_fraction_" + phase, outmesh, [this, i](IdxCell idx) {
+                  return advection_solver->GetField(i)[out_to_mesh_[idx]] /
+                      fc_density[out_to_mesh_[idx]]; }));
+    }
+
+    // Density output field
+    for (auto i : phases) {
+      std::string phase = IntToStr(i);
+      content_pool.push_back(
+          std::make_shared<output::EntryFunction<Scal, IdxCell, Mesh>>(
+              "density_" + phase, outmesh, [this, i](IdxCell idx) {
+                  return v_fc_true_density[i][out_to_mesh_[idx]]; }));
+    }
+
+    // Target density output field
+    for (auto i : phases) {
+      std::string phase = IntToStr(i);
+      content_pool.push_back(
+          std::make_shared<output::EntryFunction<Scal, IdxCell, Mesh>>(
+              "target_density_" + phase, outmesh, [this, i](IdxCell idx) {
+                  return v_fc_true_density_target[i][out_to_mesh_[idx]]; }));
+    }
+
+    // Partial density output field
+    for (auto i : phases) {
+      std::string phase = IntToStr(i);
+      content_pool.push_back(
+          std::make_shared<output::EntryFunction<Scal, IdxCell, Mesh>>(
+              "partial_density_" + phase, outmesh, [this, i](IdxCell idx) {
+                  return advection_solver->GetField(i)[out_to_mesh_[idx]]; }));
+    }
+
+    // Volume fraction output field
+    for (auto i : phases) {
+      std::string phase = IntToStr(i);
+      content_pool.push_back(
+          std::make_shared<output::EntryFunction<Scal, IdxCell, Mesh>>(
+              "volume_fraction_" + phase, outmesh, [this, i](IdxCell idx) {
+                  return v_fc_volume_fraction[i][out_to_mesh_[idx]]; }));
+    }*/
+
+    for (auto& entry : content_pool) {
+      if (P_bool[std::string("output_") + entry->GetName()]) {
+        content.push_back(entry);
+      }
+    }
+
+    if (!P_string.exist(_plt_title)) {
+      P_string.set(_plt_title, P_string[_exp_name]);
+    }
+    if (!P_string.exist("filename_field")) {
+      P_string.set("filename_field", P_string[_exp_name] + ".field");
+    }
+
+    std::string field_output_format = P_string["field_output_format"];
+    if (field_output_format == "tecplot_binary") {
+      session = std::make_shared<output::SessionTecplotBinaryStructured<Mesh>>(
+          content, P_string[_plt_title], outmesh,
+          P_string["filename_field"] + ".plt");
+    } else if (field_output_format == "paraview") {
+      session = std::make_shared<output::SessionParaviewStructured<Mesh>>(
+          content, P_string[_plt_title],
+          P_string["filename_field"], outmesh);
+    }
+
+    last_frame_time_ = 0;
+  }
+}
+
 
 template <class Mesh>
 void hydro_core<Mesh>::InitFluidSolver() {
@@ -639,207 +865,57 @@ void hydro_core<Mesh>::InitHeatSolver() {
 
 template <class Mesh>
 void hydro_core<Mesh>::InitOutput() {
-  if (flags.no_output) {
-    return;
-  }
+  if (!flags.no_scalar_output) {
+    // Scalar output
+    auto P = [this](std::string entry, std::string parameter) {
+      return std::make_shared<output::EntryScalarFunction<Scal>>(
+          entry, [this, parameter](){ return P_double[parameter]; });
+    };
+    content_scalar = {
+        P("time", "t"),
+        std::make_shared<output::EntryScalarFunction<Scal>>(
+            "num_iters", [this](){
+                return P_int["s"];
+            }),
+        std::make_shared<output::EntryScalarFunction<Scal>>(
+            "iter_diff_velocity", [this](){
+                return fluid_solver->GetConvergenceIndicator();
+            })
+    };
 
-  // Create output mesh
-  MIdx output_factor;
-  for (size_t i = 0; i < dim; ++i) {
-    output_factor[i] = P_int[std::string("output_factor_") +
-                         Direction(i).GetLetter()];
-  }
-  MIdx mesh_size = mesh.GetBlockCells().GetDimensions();
-  geom::Rect<Vect> domain(GetVect<Vect>(P_vect["A"]),
-                          GetVect<Vect>(P_vect["B"]));
-  geom::InitUniformMesh(outmesh, domain, mesh_size * output_factor);
-  out_to_mesh_.Reinit(outmesh);
-  for (auto outidx : outmesh.Cells()) {
-    MIdx outmidx = outmesh.GetBlockCells().GetMIdx(outidx);
-    out_to_mesh_[outidx] =
-        mesh.GetBlockCells().GetIdx(outmidx / output_factor);
-  }
 
-  // TODO: EntryFunctionField
-  output::Content content_pool = {
-      std::make_shared<output::EntryFunction<Scal, IdxNode, Mesh>>(
-          "x", outmesh, [this](IdxNode idx) { return outmesh.GetNode(idx)[0]; })
-      , std::make_shared<output::EntryFunction<Scal, IdxNode, Mesh>>(
-          "y", outmesh, [this](IdxNode idx) { return outmesh.GetNode(idx)[1]; })
-      , std::make_shared<output::EntryFunction<Scal, IdxNode, Mesh>>(
-          "z", outmesh, [this](IdxNode idx) {
-              return dim == 2 ? 0. : outmesh.GetNode(idx)[2]; })
-      , std::make_shared<output::EntryFunction<Scal, IdxCell, Mesh>>(
-          "velocity_x", outmesh, [this](IdxCell idx) {
-              return fluid_solver->GetVelocity()[out_to_mesh_[idx]][0]; })
-      , std::make_shared<output::EntryFunction<Scal, IdxCell, Mesh>>(
-          "velocity_y", outmesh, [this](IdxCell idx) {
-              return fluid_solver->GetVelocity()[out_to_mesh_[idx]][1]; })
-      , std::make_shared<output::EntryFunction<Scal, IdxCell, Mesh>>(
-          "velocity_z", outmesh, [this](IdxCell idx) {
-              return dim == 2 ? 0. :
-                  fluid_solver->GetVelocity()[out_to_mesh_[idx]][2]; })
-      , std::make_shared<output::EntryFunction<Scal, IdxCell, Mesh>>(
-          "pressure", outmesh, [this](IdxCell idx) {
-              return fluid_solver->GetPressure()[out_to_mesh_[idx]]; })
-      , std::make_shared<output::EntryFunction<Scal, IdxCell, Mesh>>(
-          "density", outmesh, [this](IdxCell idx) {
-              return fc_density[out_to_mesh_[idx]]; })
-      , std::make_shared<output::EntryFunction<Scal, IdxCell, Mesh>>(
-          "viscosity", outmesh, [this](IdxCell idx) {
-              return fc_viscosity_smooth[out_to_mesh_[idx]]; })
-      , std::make_shared<output::EntryFunction<Scal, IdxCell, Mesh>>(
-          "radiation", outmesh, [this](IdxCell idx) {
-              return fc_radiation[out_to_mesh_[idx]]; })
-      , std::make_shared<output::EntryFunction<Scal, IdxCell, Mesh>>(
-          "volume_source", outmesh, [this](IdxCell idx) {
-              return fc_volume_source[out_to_mesh_[idx]]; })
-      , std::make_shared<output::EntryFunction<Scal, IdxCell, Mesh>>(
-          "temperature", outmesh, [this](IdxCell idx) {
-              return heat_solver->GetTemperature()[out_to_mesh_[idx]]; })
-      , std::make_shared<output::EntryFunction<Scal, IdxCell, Mesh>>(
-          "excluded", outmesh, [this](IdxCell idx) {
-              return mesh.IsExcluded(out_to_mesh_[idx]) ? 1. : 0.; })
-      , std::make_shared<output::EntryFunction<Scal, IdxCell, Mesh>>(
-          "divergence", outmesh, [this](IdxCell idx) {
-              auto idxcell = out_to_mesh_[idx];
-              Scal sum = 0.;
-              for (size_t i = 0; i < mesh.GetNumNeighbourFaces(idxcell); ++i) {
-                sum += fluid_solver->
-                    GetVolumeFlux()[mesh.GetNeighbourFace(idxcell, i)] *
-                    mesh.GetOutwardFactor(idxcell, i);
-              }
-              return sum / mesh.GetVolume(idxcell);})
-  };
-
-  // Mass source output field
-  for (auto i : phases) {
-    std::string phase = IntToStr(i);
-    content_pool.push_back(
-        std::make_shared<output::EntryFunction<Scal, IdxCell, Mesh>>(
-                "mass_source_" + phase, outmesh, [this, i](IdxCell idx) {
-                    return v_fc_mass_source[i][out_to_mesh_[idx]]; }));
-  }
-
-  // Mass fraction output field
-  for (auto i : phases) {
-    std::string phase = IntToStr(i);
-    content_pool.push_back(
-        std::make_shared<output::EntryFunction<Scal, IdxCell, Mesh>>(
-            "mass_fraction_" + phase, outmesh, [this, i](IdxCell idx) {
-                return advection_solver->GetField(i)[out_to_mesh_[idx]] /
-                    fc_density[out_to_mesh_[idx]]; }));
-  }
-
-  // Density output field
-  for (auto i : phases) {
-    std::string phase = IntToStr(i);
-    content_pool.push_back(
-        std::make_shared<output::EntryFunction<Scal, IdxCell, Mesh>>(
-            "density_" + phase, outmesh, [this, i](IdxCell idx) {
-                return v_fc_true_density[i][out_to_mesh_[idx]]; }));
-  }
-
-  // Target density output field
-  for (auto i : phases) {
-    std::string phase = IntToStr(i);
-    content_pool.push_back(
-        std::make_shared<output::EntryFunction<Scal, IdxCell, Mesh>>(
-            "target_density_" + phase, outmesh, [this, i](IdxCell idx) {
-                return v_fc_true_density_target[i][out_to_mesh_[idx]]; }));
-  }
-
-  // Partial density output field
-  for (auto i : phases) {
-    std::string phase = IntToStr(i);
-    content_pool.push_back(
-        std::make_shared<output::EntryFunction<Scal, IdxCell, Mesh>>(
-            "partial_density_" + phase, outmesh, [this, i](IdxCell idx) {
-                return advection_solver->GetField(i)[out_to_mesh_[idx]]; }));
-  }
-
-  // Volume fraction output field
-  for (auto i : phases) {
-    std::string phase = IntToStr(i);
-    content_pool.push_back(
-        std::make_shared<output::EntryFunction<Scal, IdxCell, Mesh>>(
-            "volume_fraction_" + phase, outmesh, [this, i](IdxCell idx) {
-                return v_fc_volume_fraction[i][out_to_mesh_[idx]]; }));
-  }
-
-  for (auto& entry : content_pool) {
-    if (P_bool[std::string("output_") + entry->GetName()]) {
-      content.push_back(entry);
+    // stat_mass scalar output
+    for (auto i : phases) {
+      std::string phase = IntToStr(i);
+      content_scalar.push_back(P("mass_" + phase,
+                                 "stat_mass_" + phase));
+      content_scalar.push_back(P("mass_in_" + phase,
+                                 "stat_mass_in_" + phase));
+      content_scalar.push_back(P("mass_out_" + phase,
+                                 "stat_mass_out_" + phase));
     }
+
+    // stat_volume scalar output
+    for (auto i : phases) {
+      std::string phase = IntToStr(i);
+      content_scalar.push_back(P("volume_" + phase,
+                                 "stat_volume_" + phase));
+      content_scalar.push_back(P("volume_in_" + phase,
+                                 "stat_volume_in_" + phase));
+      content_scalar.push_back(P("volume_out_" + phase,
+                                 "stat_volume_out_" + phase));
+    }
+
+    if (!P_string.exist("filename_scalar")) {
+      P_string.set("filename_scalar", P_string[_exp_name] + ".scalar");
+    }
+
+    session_scalar = std::make_shared<output::SessionTecplotAsciiScalar<Scal>>(
+        content_scalar, P_string[_plt_title],
+        P_string[_plt_title], P_string["filename_scalar"] + ".dat");
+
+    last_frame_scalar_time_ = 0;
   }
-
-  // Scalar output
-  auto P = [this](std::string entry, std::string parameter) {
-    return std::make_shared<output::EntryScalarFunction<Scal>>(
-        entry, [this, parameter](){ return P_double[parameter]; });
-  };
-  content_scalar = {
-      P("time", "t"),
-      std::make_shared<output::EntryScalarFunction<Scal>>(
-          "num_iters", [this](){
-              return P_int["s"];
-          }),
-      std::make_shared<output::EntryScalarFunction<Scal>>(
-          "iter_diff_velocity", [this](){
-              return fluid_solver->GetConvergenceIndicator();
-          })
-  };
-
-
-  // stat_mass scalar output
-  for (auto i : phases) {
-    std::string phase = IntToStr(i);
-    content_scalar.push_back(P("mass_" + phase,
-                               "stat_mass_" + phase));
-    content_scalar.push_back(P("mass_in_" + phase,
-                               "stat_mass_in_" + phase));
-    content_scalar.push_back(P("mass_out_" + phase,
-                               "stat_mass_out_" + phase));
-  }
-
-  // stat_volume scalar output
-  for (auto i : phases) {
-    std::string phase = IntToStr(i);
-    content_scalar.push_back(P("volume_" + phase,
-                               "stat_volume_" + phase));
-    content_scalar.push_back(P("volume_in_" + phase,
-                               "stat_volume_in_" + phase));
-    content_scalar.push_back(P("volume_out_" + phase,
-                               "stat_volume_out_" + phase));
-  }
-
-  if (!P_string.exist(_plt_title)) {
-    P_string.set(_plt_title, P_string[_exp_name]);
-  }
-  if (!P_string.exist("filename_field")) {
-    P_string.set("filename_field", P_string[_exp_name] + ".field");
-  }
-  if (!P_string.exist("filename_scalar")) {
-    P_string.set("filename_scalar", P_string[_exp_name] + ".scalar");
-  }
-
-  std::string field_output_format = P_string["field_output_format"];
-  if (field_output_format == "tecplot_binary") {
-    session = std::make_shared<output::SessionTecplotBinaryStructured<Mesh>>(
-        content, P_string[_plt_title], outmesh,
-        P_string["filename_field"] + ".plt");
-  } else if (field_output_format == "paraview") {
-    session = std::make_shared<output::SessionParaviewStructured<Mesh>>(
-        content, P_string[_plt_title],
-        P_string["filename_field"], outmesh);
-  }
-
-  session_scalar = std::make_shared<output::SessionTecplotAsciiScalar<Scal>>(
-      content_scalar, P_string[_plt_title],
-      P_string[_plt_title], P_string["filename_scalar"] + ".dat");
-
-  last_frame_time_ = 0;
-  last_frame_scalar_time_ = 0;
 }
 
 template <class Mesh>
@@ -849,8 +925,6 @@ hydro_core<Mesh>::hydro_core(TExperiment* _ex, Mesh& mesh, Flags& flags)
     , num_phases(P_int["num_phases"])
     , phases(0, num_phases)
 {
-  flags.no_output = P_bool["no_output"];
-
   P_int.set("last_s", 0);
   P_double.set("last_R", 0);
   P_double.set("last_Rn", 0);
@@ -871,10 +945,7 @@ hydro_core<Mesh>::hydro_core(TExperiment* _ex, Mesh& mesh, Flags& flags)
 
   InitOutput();
 
-  if (!flags.no_output) {
-    if (P_int["max_frame_index"] > 0) {
-      session->Write(0., P_string[_plt_title] + ":0");
-    }
+  if (!flags.no_scalar_output) {
     session_scalar->Write();
   }
 }
@@ -1442,30 +1513,18 @@ auto hydro_core<Mesh>::GetField(OutputFieldName field_name) const
 
 template <class Mesh>
 void hydro_core<Mesh>::write_results(bool force) {
-  if (flags.no_output) {
-    return;
-  }
+  if (!flags.no_scalar_output) {
+    const double time = fluid_solver->GetTime();
+    const double total_time = P_double["T"];
+    const size_t max_frame_scalar_index = P_int["max_frame_scalar_index"];
+    const double frame_scalar_duration = total_time / max_frame_scalar_index;
 
-  const double time = fluid_solver->GetTime();
-  const double total_time = P_double["T"];
-  const size_t max_frame_index = P_int["max_frame_index"];
-  const double frame_duration = total_time / max_frame_index;
-
-  if (force || (!ecast(P_bool("no_mesh_output")) &&
-      time >= last_frame_time_ + frame_duration)) {
-    last_frame_time_ = time;
-    session->Write(time, P_string[_plt_title] + ":" + IntToStr(P_int["n"]));
-    logger() << "Frame " << (P_int["current_frame"]++) << ": t=" << time;
-  }
-
-  const size_t max_frame_scalar_index = P_int["max_frame_scalar_index"];
-  const double frame_scalar_duration = total_time / max_frame_scalar_index;
-
-  if (force || time >= last_frame_scalar_time_ + frame_scalar_duration) {
-    last_frame_scalar_time_ = time;
-    session_scalar->Write();
-    logger() << "Frame_scalar " << (P_int["current_frame_scalar"]++)
-        << ": t=" << time;
+    if (force || time >= last_frame_scalar_time_ + frame_scalar_duration) {
+      last_frame_scalar_time_ = time;
+      session_scalar->Write();
+      logger() << "Frame_scalar " << (P_int["current_frame_scalar"]++)
+          << ": t=" << time;
+    }
   }
 }
 
