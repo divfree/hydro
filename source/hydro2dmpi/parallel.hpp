@@ -120,7 +120,7 @@ class ParallelTools {
  public:
   // Processor with rank = 0 acts as a master
   // and doesn't take part in the computation
-  ParallelTools(const Mesh& mesh)
+  ParallelTools(const Mesh& mesh, int overlap_width)
       : global_mesh_(mesh) {
     MPI_Comm_size(MPI_COMM_WORLD, &num_processors_);
     MPI_Comm_rank(MPI_COMM_WORLD, &current_rank_);
@@ -128,7 +128,7 @@ class ParallelTools {
     // Init local meshes
     v_processor_.resize(num_processors_);
     for (int rank = 1; rank < num_processors_; ++rank) {
-      InitLocalMesh(mesh, rank);
+      InitLocalMesh(mesh, rank, overlap_width);
     }
 
     // For each cell, find all related processors
@@ -225,6 +225,9 @@ class ParallelTools {
              MPI_Scal, source, tag, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
   }
   void SendOverlap(const geom::FieldCell<Scal>& fc_local, int dest) {
+    if (dest == current_rank_) {
+      throw std::runtime_error("Can't send a message to myself");
+    }
     int rank = current_rank_;
     std::vector<Scal> buf;
     for (CellConnection idxcells : v_processor_[dest].v_source_list[rank]) {
@@ -237,6 +240,9 @@ class ParallelTools {
              MPI_Scal, dest, tag, MPI_COMM_WORLD);
   }
   void RecvOverlap(geom::FieldCell<Scal>& fc_local, int source) {
+    if (source == current_rank_) {
+      throw std::runtime_error("Can't receive a message from myself");
+    }
     int rank = current_rank_;
     std::vector<Scal> buf(v_processor_[rank].v_source_list[source].size());
     int tag = 0;

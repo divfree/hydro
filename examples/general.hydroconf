@@ -117,6 +117,9 @@ set double guess_extrapolation 0
 #set double antidiffusion_factor 0
 set bool compressible_enable 0
 
+# parallel
+set int parallel_overlap_width 2
+
 # particles
 set double spawning_gap 0.25
 set double particle_radius 1.5

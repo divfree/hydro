@@ -229,6 +229,8 @@ class FluidSolver : public UnsteadyIterativeSolver {
   }
   virtual const geom::FieldCell<Vect>& GetVelocity() = 0;
   virtual const geom::FieldCell<Vect>& GetVelocity(Layers layer) = 0;
+  virtual void CorrectVelocity(
+      Layers layer, const geom::FieldCell<Vect>& fc_velocity_corr) = 0;
   virtual const geom::FieldCell<Scal>& GetPressure() = 0;
   virtual const geom::FieldCell<Scal>& GetPressure(Layers layer) = 0;
   virtual const geom::FieldFace<Scal>& GetVolumeFlux() = 0;
@@ -259,6 +261,15 @@ class NoSlipWallFixed : public NoSlipWall<Mesh> {
   Vect GetVelocity() const override {
     return velocity_;
   }
+};
+
+template <class Mesh>
+class ConditionFaceReferenceToGlobal :
+    public NoSlipWallFixed<Mesh> {
+ public:
+  ConditionFaceReferenceToGlobal(typename Mesh::Vect velocity)
+      : NoSlipWallFixed<Mesh>(velocity)
+  {}
 };
 
 template <class Mesh>
@@ -1108,6 +1119,10 @@ class FluidSimple : public FluidSolver<Mesh> {
   }
   const geom::FieldCell<Vect>& GetVelocity(Layers layer) override {
     return conv_diff_solver_->GetVelocity(layer);
+  }
+  void CorrectVelocity(Layers layer,
+                       const geom::FieldCell<Vect>& fc_velocity_corr) override {
+    conv_diff_solver_->CorrectVelocity(layer, fc_velocity_corr);
   }
   const geom::FieldCell<Scal>& GetPressure() override {
     return fc_pressure_.time_curr;

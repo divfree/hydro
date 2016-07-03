@@ -102,6 +102,7 @@ class hydro_core : public TModule
   using FieldFace = geom::FieldFace<T>;
   template <class T>
   using FieldNode = geom::FieldNode<T>;
+  std::shared_ptr<solver::ParallelTools<Mesh>> parallel;
   const typename solver::ParallelTools<Mesh>::Processor& processor_;
   const Mesh& global_mesh;
   const Mesh& mesh;
@@ -173,11 +174,14 @@ class hydro_core : public TModule
 
  public:
   enum class OutputFieldName {
-    fc_velocity_x, fc_velocity_y, fc_velocity_z
+    fc_velocity_x, fc_velocity_y, fc_velocity_z, fc_rank
   };
 
+  using ConditionFaceReferenceToGlobal =
+      solver::fluid_condition::ConditionFaceReferenceToGlobal<Mesh>;
+
   hydro_core(TExperiment* _ex, const Mesh& global_mesh,
-             const typename solver::ParallelTools<Mesh>::Processor& processor,
+             std::shared_ptr<solver::ParallelTools<Mesh>> parallel,
              Flags& flags);
   ~hydro_core() {}
   void step();
@@ -248,13 +252,14 @@ class hydro : public TModule
 
     if (is_worker) {
       hydro_core_ = std::make_shared<
-          hydro_core<Mesh>>(_ex, mesh, parallel->GetProcessor(), flags);
+          hydro_core<Mesh>>(_ex, mesh, parallel, flags);
     }
 
     if (!flags.no_field_output) {
       output_field_refs_[OutputFieldName::fc_velocity_x] = nullptr;
       output_field_refs_[OutputFieldName::fc_velocity_y] = nullptr;
       output_field_refs_[OutputFieldName::fc_velocity_z] = nullptr;
+      output_field_refs_[OutputFieldName::fc_rank] = nullptr;
 
       for (auto it = output_field_refs_.begin();
           it != output_field_refs_.end(); ++it) {
@@ -262,9 +267,9 @@ class hydro : public TModule
             it->first, FieldCell<Scal>(mesh)).first->second;
       }
 
-      if (P_int["max_frame_index"] > 0) {
-        session->Write(0., P_string[_plt_title] + ":0");
-      }
+//      if (P_int["max_frame_index"] > 0) {
+//        session->Write(0., P_string[_plt_title] + ":0");
+//      }
     }
   }
   ~hydro() {}
@@ -372,7 +377,8 @@ void hydro<Mesh>::InitMesh() {
 
 template <class Mesh>
 void hydro<Mesh>::InitParallel() {
-  parallel = std::make_shared<solver::ParallelTools<Mesh>>(mesh);
+  parallel = std::make_shared<solver::ParallelTools<Mesh>>(
+      mesh, P_int["parallel_overlap_width"]);
   rank_ = parallel->GetRank();
 
   is_master = (rank_ == 0);
@@ -435,6 +441,10 @@ void hydro<Mesh>::InitOutput() {
                 return dim == 2 ? 0. :
                     output_fields_[OutputFieldName::fc_velocity_z]
                                       [out_to_mesh_[idx]]; })
+        , std::make_shared<output::EntryFunction<Scal, IdxCell, Mesh>>(
+            "rank", outmesh, [this](IdxCell idx) {
+                return output_fields_[OutputFieldName::fc_rank]
+                                         [out_to_mesh_[idx]]; })
        /* , std::make_shared<output::EntryFunction<Scal, IdxCell, Mesh>>(
             "pressure", outmesh, [this](IdxCell idx) {
                 return fluid_solver->GetPressure()[out_to_mesh_[idx]]; })
@@ -632,9 +642,9 @@ void hydro_core<Mesh>::InitFluidSolver() {
       } else if (is_far_boundary(idxface)) {
         fluid_cond[idxface] =
             solver::Parse(P_string["condition_far"], idxface, mesh);
-      } else {
+      } else { // Between blocks
         fluid_cond[idxface] =
-            solver::Parse(P_string["condition_left"], idxface, mesh);
+            std::make_shared<ConditionFaceReferenceToGlobal>(Vect::kZero);
         // throw std::runtime_error("Unhandled boundary");
       }
     } else {
@@ -959,11 +969,12 @@ void hydro_core<Mesh>::InitOutput() {
 template <class Mesh>
 hydro_core<Mesh>::hydro_core(
     TExperiment* _ex, const Mesh& global_mesh,
-    const typename solver::ParallelTools<Mesh>::Processor& processor,
+    std::shared_ptr<solver::ParallelTools<Mesh>> parallel,
     Flags& flags)
     : TExperiment_ref(_ex), TModule(_ex)
-    , processor_(processor), global_mesh(global_mesh)
-    , mesh(processor.mesh), flags(flags)
+    , parallel(parallel)
+    , processor_(parallel->GetProcessor()), global_mesh(global_mesh)
+    , mesh(processor_.mesh), flags(flags)
     , num_phases(P_int["num_phases"])
     , phases(0, num_phases)
 {
@@ -1469,6 +1480,43 @@ void hydro_core<Mesh>::step() {
         fluid_solver->GetIterationCount() < iter_history_sfixed)) {
       fluid_solver->MakeIteration();
 
+      // MPI exchange
+      int rank = parallel->GetRank();
+      auto fc_velocity_orig =
+          fluid_solver->GetVelocity(solver::Layers::iter_curr);
+      auto fc_velocity_new =
+          fluid_solver->GetVelocity(solver::Layers::iter_curr);
+      for (size_t i = 0; i < dim; ++i) {
+        auto fc_comp = geom::GetComponent(fc_velocity_new, i);
+        for (int remote = 1; remote < parallel->GetNumProcessors(); ++remote) {
+          if (rank < remote) {
+            parallel->SendOverlap(fc_comp, remote);
+            parallel->RecvOverlap(fc_comp, remote);
+          } else if (remote < rank) {
+            parallel->RecvOverlap(fc_comp, remote);
+            parallel->SendOverlap(fc_comp, remote);
+          }
+        }
+        SetComponent(fc_velocity_new, i, fc_comp);
+      }
+//      auto fc_velocity_corr = fc_velocity_new;
+//      for (auto idxcell : mesh.Cells()) {
+//        fc_velocity_corr[idxcell] -= fc_velocity_orig[idxcell];
+//      }
+//      fluid_solver->CorrectVelocity(solver::Layers::iter_curr,
+//                                    fc_velocity_corr);
+
+      for (auto it = fluid_cond.cbegin(); it != fluid_cond.cend(); ++it) {
+        auto idxface = it->GetIdx();
+        auto cond = it->GetValue().get();
+        if (auto cond_wall =
+            dynamic_cast<ConditionFaceReferenceToGlobal*>(cond)) {
+          (*cond_wall) = ConditionFaceReferenceToGlobal(
+              fc_velocity_new[mesh.GetNeighbourCell(
+                  idxface, mesh.GetValidNeighbourCellId(idxface))]);
+        }
+      }
+
       ++P_int["s_sum"];
       P_int["s"] = static_cast<int>(fluid_solver->GetIterationCount());
 
@@ -1539,6 +1587,9 @@ auto hydro_core<Mesh>::GetField(OutputFieldName field_name) const
     }
     case OutputFieldName::fc_velocity_z: {
       return geom::GetComponent(fluid_solver->GetVelocity(), 2);
+    }
+    case OutputFieldName::fc_rank: {
+      return FieldCell<Scal>(mesh, parallel->GetRank());
     }
     default:
       throw std::runtime_error("Unknown field name");
