@@ -258,7 +258,8 @@ class hydro : public TModule
 
       for (auto it = output_field_refs_.begin();
           it != output_field_refs_.end(); ++it) {
-        it->second = &output_fields_.emplace(it->first, mesh).first->second;
+        it->second = &output_fields_.emplace(
+            it->first, FieldCell<Scal>(mesh)).first->second;
       }
 
       if (P_int["max_frame_index"] > 0) {

@@ -17,22 +17,25 @@ class Logger {
   class LogStream {
     Logger* parent_;
     const std::string prefix_;
-    std::stringstream buf_;
+    std::shared_ptr<std::stringstream> buf_;
     const bool no_eol_;
    public:
     LogStream() = delete;
     LogStream(LogStream&&) = default;
     LogStream(Logger* parent, bool no_eol)
-        : parent_(parent), no_eol_(no_eol) {}
+        : parent_(parent), buf_(std::make_shared<std::stringstream>()),
+          no_eol_(no_eol) {}
     LogStream(Logger* parent, std::string prefix, bool no_eol)
-        : parent_(parent), prefix_(prefix), no_eol_(no_eol) {}
+        : parent_(parent), prefix_(prefix),
+          buf_(std::make_shared<std::stringstream>()),
+          no_eol_(no_eol) {}
     template <class T>
     LogStream& operator<<(const T& value) {
-      buf_ << value;
+      (*buf_) << value;
       return *this;
     }
     ~LogStream() {
-      (*parent_->p_stream_) << prefix_ << buf_.str();
+      (*parent_->p_stream_) << prefix_ << (*buf_).str();
       if (!no_eol_) {
         (*parent_->p_stream_) << std::endl;
       } else {

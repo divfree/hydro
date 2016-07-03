@@ -16,7 +16,7 @@ class ParallelTools {
   using IdxNode = geom::IdxNode;
   using Scal = typename Mesh::Scal;
   using Vect = typename Mesh::Vect;
-  static constexpr auto MPI_Scal =
+  MPI_Datatype MPI_Scal =
       (sizeof(Scal) == sizeof(double) ? MPI_DOUBLE : MPI_FLOAT);
   struct CellConnection {
     IdxCell local;
