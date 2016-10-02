@@ -36,6 +36,9 @@ endif()
 if (MODULE_TEST)
   add_definitions("-DMODULE_TEST")
 endif()
+if (MODULE_HEAT_STORAGE)
+  add_definitions("-DMODULE_HEAT_STORAGE")
+endif()
 
 # Static build for MSVC
 set(CMAKE_USER_MAKE_RULES_OVERRIDE
@@ -83,6 +86,7 @@ aux_source_directory(source/common SOURCES_COMMON)
 aux_source_directory(source/control SOURCES_CONTROL)
 aux_source_directory(source/hydro2dmpi SOURCES_HYDRO_MODULE)
 aux_source_directory(source/test_module SOURCES_TEST_MODULE)
+aux_source_directory(source/heat_storage_module SOURCES_HEAT_STORAGE_MODULE)
 aux_source_directory(source SOURCES_ROOT)
 
 set(SOURCE_FILES
@@ -90,6 +94,7 @@ set(SOURCE_FILES
   ${SOURCES_CONTROL}
   ${SOURCES_HYDRO_MODULE}
   ${SOURCES_TEST_MODULE}
+  ${SOURCES_HEAT_STORAGE_MODULE}
   ${SOURCES_ROOT}
 )
 
