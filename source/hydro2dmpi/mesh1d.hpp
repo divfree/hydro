@@ -111,7 +111,6 @@ class MeshStructured : public MeshGeneric<Scal, 1> {
     return fc_neighbour_face_[idxcell][n];
   }
   Scal GetOutwardFactor(IdxCell, size_t n) const override {
-    Scal factor;
     return (n == 0) ? -1. : 1.;
   }
   // n same as for GetNeighbourCell()
@@ -217,7 +216,7 @@ class MeshStructured : public MeshGeneric<Scal, 1> {
    Vect CalcSurface(IdxFace idxface) const {
      Vect v = GetNode(GetNeighbourNode(idxface, 1)) -
          GetNode(GetNeighbourNode(idxface, 0));
-     return Vect(v[1], -v[0]);
+     return Vect(v[0]);
    }
    Scal CalcVolume(IdxCell idxcell) const {
      Scal res = 0.;
@@ -271,8 +270,8 @@ MeshStructured<Scal>::MeshStructured(const BlockNodes& b_nodes,
   // Offset for cell neighbour cells
   {
     auto offset = [this](IntIdx i) {
-      return static_cast<IntIdx>(b_cells_.GetIdx(MIdx(i, j)).GetRaw() -
-          b_cells_.GetIdx(MIdx(0, 0)).GetRaw());
+      return static_cast<IntIdx>(b_cells_.GetIdx(MIdx(i)).GetRaw() -
+          b_cells_.GetIdx(MIdx(0)).GetRaw());
     };
 
     cell_neighbour_cell_offset_ = {{offset(-1), offset(1)}};
@@ -297,9 +296,7 @@ MeshStructured<Scal>::MeshStructured(const BlockNodes& b_nodes,
           b_cells_.GetIdx(midx - dir),
           b_cells_.GetIdx(midx)}};
       if (dir == Direction::i) {
-        ff_neighbour_node_[idxface] = {{
-            b_nodes_.GetIdx(midx),
-            b_nodes_.GetIdx(midx + Direction::j)}};
+        ff_neighbour_node_[idxface] = {{b_nodes_.GetIdx(midx)}};
       }
       if (midx[dir] == mb[dir]) {
         ff_neighbour_cell_[idxface][0] = IdxCell::None();

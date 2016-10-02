@@ -9,8 +9,8 @@ namespace heat_storage_module
 namespace registrators {
 
 #ifdef MODULE_HEAT_STORAGE
-ModuleRegistrator<hydro<geom::geom2d::MeshStructured<double>>>
-reg_double({"test"});
+ModuleRegistrator<hydro<geom::geom1d::MeshStructured<double>>>
+reg_double({"heat_storage"});
 #endif
 
 } // namespace registrators
