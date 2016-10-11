@@ -210,13 +210,10 @@ class MeshStructured : public MeshGeneric<Scal, 1> {
      return res / Scal(GetNumNeighbourNodes(idxface));
    }
    Scal CalcArea(IdxFace idxface) const {
-     return GetNode(GetNeighbourNode(idxface, 1)).dist(
-         GetNode(GetNeighbourNode(idxface, 0)));
+     return 1.;
    }
    Vect CalcSurface(IdxFace idxface) const {
-     Vect v = GetNode(GetNeighbourNode(idxface, 1)) -
-         GetNode(GetNeighbourNode(idxface, 0));
-     return Vect(v[0]);
+     return Vect(1.);
    }
    Scal CalcVolume(IdxCell idxcell) const {
      Scal res = 0.;
