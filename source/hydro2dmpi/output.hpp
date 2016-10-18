@@ -212,7 +212,45 @@ class SessionPlain : public Session {
   }
 };
 
+
+template <class Scal>
+class SessionPlainScalar : public Session {
+ public:
+  SessionPlainScalar(const Content& content, std::string filename)
+      : content_(content)
+      , out_(output_file_)
+  {
+    output_file_.open(filename);
+    for (auto& entry_generic : content_) {
+      out_ << entry_generic->GetName() << " ";
+    }
+    out_ << std::endl;
+  }
+  void Write(double /*time = 0.*/, std::string /*title = ""*/) override {
+    for (auto& entry_generic : content_) {
+      entry_generic->Prepare();
+      if (auto entry = dynamic_cast<EntryScalar<Scal>*>(
+          entry_generic.get())) {
+        out_ << entry->GetValue() << " ";
+      } else {
+        throw std::runtime_error(
+            "SessionPlainScalar: Unknown entry type");
+      }
+    }
+
+    out_ << std::endl;
+  }
+ private:
+  Content content_;
+  std::ostream& out_;
+  std::ofstream output_file_;
+};
+
+
 } // namespace plain
+
+template <class Scal>
+using SessionPlainScalar = plain::SessionPlainScalar<Scal>;
 
 template <class Mesh>
 using SessionPlain = plain::SessionPlain<Mesh>;
