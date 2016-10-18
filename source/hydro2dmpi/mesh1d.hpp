@@ -209,10 +209,10 @@ class MeshStructured : public MeshGeneric<Scal, 1> {
      }
      return res / Scal(GetNumNeighbourNodes(idxface));
    }
-   Scal CalcArea(IdxFace idxface) const {
+   Scal CalcArea(IdxFace /*idxface*/) const {
      return 1.;
    }
-   Vect CalcSurface(IdxFace idxface) const {
+   Vect CalcSurface(IdxFace /*idxface*/) const {
      return Vect(1.);
    }
    Scal CalcVolume(IdxCell idxcell) const {

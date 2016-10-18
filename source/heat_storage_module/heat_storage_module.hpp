@@ -9,7 +9,6 @@
 #include "../hydro2dmpi/mesh.hpp"
 #include "../hydro2dmpi/mesh1d.hpp"
 #include "../hydro2dmpi/output.hpp"
-#include "../hydro2dmpi/output_tecplot.hpp"
 #include "../hydro2dmpi/linear.hpp"
 #include "../hydro2dmpi/solver.hpp"
 #include <memory>
@@ -64,12 +63,46 @@ class hydro : public TModule
 
   double last_frame_time_;
   double last_frame_scalar_time_;
-  void StepMultigrid();
+
+  class Scheduler {
+   public:
+    enum class State { Charging, Idle, Discharging };
+
+    Scheduler(double d1, double d2, double d3, double d4)
+        : d1_(d1), d2_(d2), d3_(d3), d4_(d4) {}
+
+    State GetState(double t) {
+      double cycle_duration = d1_ + d2_ + d3_ + d4_;
+      size_t cycle = static_cast<size_t>(t / cycle_duration);
+      double offset = t - cycle * cycle_duration;
+      return offset < d1_ ? State::Charging :
+          offset < d1_ + d2_ ? State::Idle :
+          offset < d1_ + d2_ + d3_ ? State::Discharging : State::Idle;
+    }
+    size_t GetStateIdx(double t) {
+      switch (GetState(t)) {
+        case State::Charging:
+          return 1;
+        case State::Discharging:
+          return 2;
+        case State::Idle:
+          return 3;
+        default:
+          assert(false);
+      }
+    }
+   private:
+    double d1_, d2_, d3_, d4_;
+  };
+
+  Scheduler scheduler_;
 };
 
 template <class Mesh>
 hydro<Mesh>::hydro(TExperiment* _ex)
-    : TExperiment_ref(_ex), TModule(_ex)
+    : TExperiment_ref(_ex), TModule(_ex),
+      scheduler_(P_double["duration_1"], P_double["duration_2"],
+                 P_double["duration_3"], P_double["duration_4"])
 {
   P_int.set("last_s", 0);
   P_double.set("last_R", 0);
@@ -88,11 +121,13 @@ hydro<Mesh>::hydro(TExperiment* _ex)
   }
   geom::Rect<Vect> domain(GetVect<Vect>(P_vect["A"]),
                           GetVect<Vect>(P_vect["B"]));
-  auto domain_size = domain.GetDimensions();
+  //auto domain_size = domain.GetDimensions();
   // Create mesh
   geom::InitUniformMesh(mesh, domain, mesh_size);
 
   P_int.set("cells_number", static_cast<int>(mesh.GetNumCells()));
+
+
 
   content = {
       std::make_shared<output::EntryFunction<Scal, IdxNode, Mesh>>(
@@ -104,30 +139,35 @@ hydro<Mesh>::hydro(TExperiment* _ex)
     return std::make_shared<output::EntryScalarFunction<Scal>>(
         entry, [this, parameter](){ return static_cast<Scal>(P_double[parameter]); });
   };
-  content_scalar = { P("time", "t") };
+  auto Pint = [this](std::string entry, std::string parameter) {
+    return std::make_shared<output::EntryScalarFunction<Scal>>(
+        entry, [this, parameter](){ return static_cast<Scal>(P_int[parameter]); });
+  };
+  content_scalar = { P("time", "t"), Pint("n", "n"),
+      std::make_shared<output::EntryScalarFunction<Scal>>(
+          "status", [this](){ return static_cast<Scal>(scheduler_.GetStateIdx(P_double["t"])); })
+  };
 
   if (!P_string.exist(_plt_title)) {
     P_string.set(_plt_title, P_string[_exp_name]);
   }
   if (!P_string.exist("filename_field")) {
-    P_string.set("filename_field", P_string[_exp_name] + ".field.plt");
+    P_string.set("filename_field", P_string[_exp_name] + ".field.dat");
   }
   if (!P_string.exist("filename_scalar")) {
-    P_string.set("filename_scalar", P_string[_exp_name] + ".scalar.plt");
+    P_string.set("filename_scalar", P_string[_exp_name] + ".scalar.dat");
   }
 
 //  session = std::make_shared<output::SessionTecplotBinaryStructured<Mesh>>(
 //      content, P_string[_plt_title], mesh, P_string["filename_field"]);
 
-  session_scalar = std::make_shared<output::SessionTecplotAsciiScalar<Scal>>(
-      content_scalar, P_string[_plt_title],
-      "zone_title", P_string["filename_scalar"]);
+  session_scalar = std::make_shared<output::SessionPlainScalar<Scal>>(
+      content_scalar, P_string["filename_scalar"]);
 
   last_frame_time_ = 0;
   last_frame_scalar_time_ = 0;
 //  session->Write(0., "initial");
   session_scalar->Write();
-
 
   // Adhoc: Write mesh nodes
   std::ofstream f("mesh.dat");
@@ -140,6 +180,7 @@ template <class Mesh>
 void hydro<Mesh>::step() {
   ex->timer_.Push("step");
 
+  ++P_int["n"];
   ex->timer_.Pop();
 }
 
