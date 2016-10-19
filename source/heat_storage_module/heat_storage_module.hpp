@@ -46,6 +46,8 @@ class hydro : public TModule
   using IdxFace = geom::IdxFace;
   using IdxNode = geom::IdxNode;
 
+  using solver::Layers;
+
   template <class T>
   using FieldCell = geom::FieldCell<T>;
   template <class T>
@@ -63,6 +65,9 @@ class hydro : public TModule
 
   double last_frame_time_;
   double last_frame_scalar_time_;
+
+  solver::LayersData<FieldCell<Scal>>
+  fc_temperature_fluid_, fc_temperature_solid_;
 
   class Scheduler {
    public:
@@ -127,7 +132,10 @@ hydro<Mesh>::hydro(TExperiment* _ex)
 
   P_int.set("cells_number", static_cast<int>(mesh.GetNumCells()));
 
-
+  fc_temperature_fluid_.time_curr.Reinit(mesh, 0.);
+  fc_temperature_fluid_.time_prev.Reinit(mesh, 0.);
+  fc_temperature_solid_.time_curr.Reinit(mesh, 0.);
+  fc_temperature_solid_.time_prev.Reinit(mesh, 0.);
 
   content = {
       std::make_shared<output::EntryFunction<Scal, IdxNode, Mesh>>(
@@ -179,6 +187,31 @@ hydro<Mesh>::hydro(TExperiment* _ex)
 template <class Mesh>
 void hydro<Mesh>::step() {
   ex->timer_.Push("step");
+
+  auto& tf = fc_temperature_fluid_.Get(Layers::time_prev);
+  auto& tf_new = fc_temperature_fluid_.Get(Layers::time_curr);
+  std::swap(tf, tf_new);
+  auto& ts = fc_temperature_solid_.Get(Layers::time_prev);
+  auto& ts_new = fc_temperature_solid_.Get(Layers::time_curr);
+  std::swap(ts, ts_new);
+
+  const Scal h = mesh.GetVolume(IdxCell(0));
+  // dt is inherited from TModule
+  const Scal uf = P_double["uf"];
+  const Scal alpha = P_double["alpha"];
+
+  for (IdxCell c : mesh.Cells()) {
+    IdxCell cm = mesh.GetNeighbourCell(c, 0);
+    IdxCell cp = mesh.GetNeighbourCell(c, 1);
+    if (cm.IsNone()) { // left boundary
+      tf_new[c] = -1.;
+    } else if (cp.IsNone()) {
+      tf_new[c] = 1.;
+    } else {
+      tf_new[c] = tf[c] - dt * uf * (tf[c] - tf[cm]) / h
+          + dt * alpha * (tf[cm] - 2. * tf[c] + tf[cp]) / sqr(h);
+    }
+  }
 
   ++P_int["n"];
   ex->timer_.Pop();
