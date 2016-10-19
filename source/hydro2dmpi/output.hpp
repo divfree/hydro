@@ -141,8 +141,9 @@ namespace plain {
 
 template <class Scal>
 class SessionPlain : public Session {
-  std::ostream& out_;
   Content content_;
+  std::ostream& out_;
+  std::ofstream output_file_;
   void WriteHeader() {
     out_ << "Output session, plain format" << std::endl;
     out_ << "All fields: ";
@@ -190,10 +191,11 @@ class SessionPlain : public Session {
     return false;
   }
  public:
-  SessionPlain(const Content& content, std::ostream& out)
-      : out_(out)
+  SessionPlain(const Content& content, std::string filename)
+      : out_(output_file_)
       , content_(content)
   {
+    output_file_.open(filename);
     WriteHeader();
   }
   void Write(double time = 0., std::string title = "") override {

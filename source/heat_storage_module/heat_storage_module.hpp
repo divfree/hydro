@@ -46,7 +46,7 @@ class hydro : public TModule
   using IdxFace = geom::IdxFace;
   using IdxNode = geom::IdxNode;
 
-  using solver::Layers;
+  using Layers = solver::Layers;
 
   template <class T>
   using FieldCell = geom::FieldCell<T>;
@@ -140,7 +140,10 @@ hydro<Mesh>::hydro(TExperiment* _ex)
   content = {
       std::make_shared<output::EntryFunction<Scal, IdxNode, Mesh>>(
           "x", mesh,
-          [this](IdxNode idx) { return mesh.GetNode(idx)[0]; })
+          [this](IdxNode idx) { return mesh.GetNode(idx)[0]; }),
+      std::make_shared<output::EntryFunction<Scal, IdxCell, Mesh>>(
+          "tf", mesh,
+          [this](IdxCell idx) { return fc_temperature_fluid_.time_curr[idx]; })
   };
 
   auto P = [this](std::string entry, std::string parameter) {
@@ -166,33 +169,27 @@ hydro<Mesh>::hydro(TExperiment* _ex)
     P_string.set("filename_scalar", P_string[_exp_name] + ".scalar.dat");
   }
 
-//  session = std::make_shared<output::SessionTecplotBinaryStructured<Mesh>>(
-//      content, P_string[_plt_title], mesh, P_string["filename_field"]);
+  session = std::make_shared<output::SessionPlain<Scal>>(
+      content, P_string["filename_field"]);
 
   session_scalar = std::make_shared<output::SessionPlainScalar<Scal>>(
       content_scalar, P_string["filename_scalar"]);
 
   last_frame_time_ = 0;
   last_frame_scalar_time_ = 0;
-//  session->Write(0., "initial");
+  session->Write(0., "initial");
   session_scalar->Write();
-
-  // Adhoc: Write mesh nodes
-  std::ofstream f("mesh.dat");
-  for (auto idxcell : mesh.Cells()) {
-    f << idxcell.GetRaw() << " " << mesh.GetCenter(idxcell) << std::endl;
-  }
 }
 
 template <class Mesh>
 void hydro<Mesh>::step() {
   ex->timer_.Push("step");
 
-  auto& tf = fc_temperature_fluid_.Get(Layers::time_prev);
-  auto& tf_new = fc_temperature_fluid_.Get(Layers::time_curr);
+  auto& tf = fc_temperature_fluid_.time_prev;
+  auto& tf_new = fc_temperature_fluid_.time_curr;
   std::swap(tf, tf_new);
-  auto& ts = fc_temperature_solid_.Get(Layers::time_prev);
-  auto& ts_new = fc_temperature_solid_.Get(Layers::time_curr);
+  auto& ts = fc_temperature_solid_.time_prev;
+  auto& ts_new = fc_temperature_solid_.time_curr;
   std::swap(ts, ts_new);
 
   const Scal h = mesh.GetVolume(IdxCell(0));
@@ -231,7 +228,7 @@ void hydro<Mesh>::write_results(bool force) {
   if (force || (!ecast(P_bool("no_mesh_output")) &&
       time >= last_frame_time_ + frame_duration)) {
     last_frame_time_ = time;
-//    session->Write(time, "step");
+    session->Write(time, "step");
     logger() << "Frame " << (P_int["current_frame"]++) << ": t=" << time;
   }
 
