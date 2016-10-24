@@ -169,8 +169,8 @@ hydro<Mesh>::hydro(TExperiment* _ex)
     P_string.set("filename_scalar", P_string[_exp_name] + ".scalar.dat");
   }
 
-  session = std::make_shared<output::SessionPlain<Scal>>(
-      content, P_string["filename_field"]);
+  session = std::make_shared<output::SessionPlain<Mesh>>(
+      content, P_string["filename_field"], mesh);
 
   session_scalar = std::make_shared<output::SessionPlainScalar<Scal>>(
       content_scalar, P_string["filename_scalar"]);

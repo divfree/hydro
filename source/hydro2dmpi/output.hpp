@@ -139,39 +139,43 @@ class Session {
 
 namespace plain {
 
-template <class Scal>
+// Requires structured mesh
+template <class Mesh>
 class SessionPlain : public Session {
+  using Scal = typename Mesh::Scal;
+  using MIdx = typename Mesh::MIdx;
+  const Mesh& mesh;
   Content content_;
   std::ostream& out_;
   std::ofstream output_file_;
   void WriteHeader() {
-    out_ << "Output session, plain format" << std::endl;
-    out_ << "All fields: ";
-    for (auto& entry_generic : content_) {
-      out_ << entry_generic->GetName() << " ";
-    }
-    out_ << "\n";
-    out_ << "Cell fields: ";
+    out_ << "Cell: ";
     for (auto& entry_generic : content_)
     if (auto entry = dynamic_cast<EntryField<geom::FieldCell<Scal>>*>(
         entry_generic.get())) {
       out_ << entry->GetName() << " ";
     }
     out_ << "\n";
-    out_ << "Face fields: ";
+    out_ << "Face: ";
     for (auto& entry_generic : content_)
     if (auto entry = dynamic_cast<EntryField<geom::FieldFace<Scal>>*>(
         entry_generic.get())) {
       out_ << entry->GetName() << " ";
     }
     out_ << "\n";
-    out_ << "Node fields: ";
+    out_ << "Node: ";
     for (auto& entry_generic : content_)
     if (auto entry = dynamic_cast<EntryField<geom::FieldNode<Scal>>*>(
         entry_generic.get())) {
       out_ << entry->GetName() << " ";
     }
     out_ << "\n";
+
+    out_ << "Dim: ";
+    MIdx dim = mesh.GetBlockCells().GetDimensions();
+    for (size_t i = 0; i < dim.size(); ++i) {
+      out_ << dim[i] << " ";
+    }
     out_ << std::endl;
   }
   void WriteFooter() {
@@ -191,16 +195,17 @@ class SessionPlain : public Session {
     return false;
   }
  public:
-  SessionPlain(const Content& content, std::string filename)
-      : out_(output_file_)
+  SessionPlain(const Content& content, std::string filename, const Mesh& mesh)
+      : mesh(mesh)
       , content_(content)
+      , out_(output_file_)
   {
     output_file_.open(filename);
     WriteHeader();
   }
   void Write(double time = 0., std::string title = "") override {
-    out_ << "Time = " << time
-        << ", Title = " << title << std::endl;
+    out_ << "Zone: time " << time
+        << ", title " << title << std::endl;
     for (auto& entry_generic : content_) {
       entry_generic->Prepare();
       TryWriteField<geom::FieldCell<Scal>>(entry_generic.get());
