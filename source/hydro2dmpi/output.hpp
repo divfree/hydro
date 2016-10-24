@@ -179,7 +179,7 @@ class SessionPlain : public Session {
     out_ << std::endl;
   }
   void WriteFooter() {
-    out_ << "Output session finished" << std::endl;
+    out_.flush();
   }
   template <class FieldType>
   bool TryWriteField(EntryGeneric* entry_generic) {
@@ -208,8 +208,14 @@ class SessionPlain : public Session {
         << ", title " << title << std::endl;
     for (auto& entry_generic : content_) {
       entry_generic->Prepare();
+    }
+    for (auto& entry_generic : content_) {
       TryWriteField<geom::FieldCell<Scal>>(entry_generic.get());
+    }
+    for (auto& entry_generic : content_) {
       TryWriteField<geom::FieldFace<Scal>>(entry_generic.get());
+    }
+    for (auto& entry_generic : content_) {
       TryWriteField<geom::FieldNode<Scal>>(entry_generic.get());
     }
     out_ << std::endl;
