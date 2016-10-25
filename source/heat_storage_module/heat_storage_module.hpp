@@ -196,14 +196,17 @@ void hydro<Mesh>::step() {
   // dt is inherited from TModule
   const Scal uf = P_double["uf"];
   const Scal alpha = P_double["alpha"];
+  const Scal Tleft = P_double["T_left"];
 
   for (IdxCell c : mesh.Cells()) {
     IdxCell cm = mesh.GetNeighbourCell(c, 0);
     IdxCell cp = mesh.GetNeighbourCell(c, 1);
     if (cm.IsNone()) { // left boundary
-      tf_new[c] = -1.;
-    } else if (cp.IsNone()) {
-      tf_new[c] = 1.;
+      tf_new[c] = tf[c] - dt * uf * (tf[c] - Tleft) / h
+          + dt * alpha * (-tf[c] + tf[cp]) / sqr(h);
+    } else if (cp.IsNone()) { // right boundary
+      tf_new[c] = tf[c] - dt * uf * (tf[c] - tf[cm]) / h
+          + dt * alpha * (tf[cm] - tf[c]) / sqr(h);
     } else {
       tf_new[c] = tf[c] - dt * uf * (tf[c] - tf[cm]) / h
           + dt * alpha * (tf[cm] - 2. * tf[c] + tf[cp]) / sqr(h);
@@ -220,7 +223,7 @@ void hydro<Mesh>::write_results(bool force) {
     return;
   }
 
-  const double time = P_int["n"];
+  const double time = P_double["t"];
   const double total_time = P_double["T"];
   const size_t max_frame_index = P_int["max_frame_index"];
   const double frame_duration = total_time / max_frame_index;
