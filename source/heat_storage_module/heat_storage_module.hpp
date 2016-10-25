@@ -33,6 +33,58 @@ geom::Vect<float, 1> GetVect<geom::Vect<float, 1>>(const column<double>& v) {
 }
 
 template <class Mesh>
+class HeatStorage : public solver::UnsteadySolver {
+ public:
+  static constexpr size_t dim = Mesh::dim;
+  using Scal = typename Mesh::Scal;
+  using MIdx = typename Mesh::MIdx;
+  using Direction = typename Mesh::Direction;
+  using Vect = typename Mesh::Vect;
+
+  using IntIdx = geom::IntIdx;
+  using IdxCell = geom::IdxCell;
+  using IdxFace = geom::IdxFace;
+  using IdxNode = geom::IdxNode;
+
+  using Layers = solver::Layers;
+
+  template <class T>
+  using FieldCell = geom::FieldCell<T>;
+  template <class T>
+  using FieldFace = geom::FieldFace<T>;
+  template <class T>
+  using FieldNode = geom::FieldNode<T>;
+
+  HeatStorage(size_t num_cells, Scal domain_length) {
+    // Prepare mesh nodes
+    MIdx mesh_size(num_cells);
+
+    geom::Rect<Vect> domain(Vect(0.), Vect(domain_length));
+
+    //auto domain_size = domain.GetDimensions();
+    // Create mesh
+    geom::InitUniformMesh(mesh, domain, mesh_size);
+
+    std::ofstream f("mesh" + IntToStr(num_cells));
+    for (auto idxcell : mesh.Cells()) {
+      f << mesh.GetVolume(idxcell) << " ";
+    }
+  }
+  const FieldCell<Scal>& GetFluidTemperature(Layers layer) {
+    return fc_temperature_fluid_.Get(layer);
+  }
+  const FieldCell<Scal>& GetFluidTemperature() {
+    return fc_temperature_fluid_.time_curr;
+  }
+  void CalcStep() {}
+
+ private:
+  Mesh mesh;
+  solver::LayersData<FieldCell<Scal>>
+  fc_temperature_fluid_, fc_temperature_solid_;
+};
+
+template <class Mesh>
 class hydro : public TModule
 {
   static constexpr size_t dim = Mesh::dim;
@@ -179,6 +231,9 @@ hydro<Mesh>::hydro(TExperiment* _ex)
   last_frame_scalar_time_ = 0;
   session->Write(0., "initial");
   session_scalar->Write();
+
+  HeatStorage<Mesh>(5, 1.);
+  HeatStorage<Mesh>(10, 2.);
 }
 
 template <class Mesh>
