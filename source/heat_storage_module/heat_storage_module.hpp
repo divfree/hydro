@@ -12,6 +12,7 @@
 #include "../hydro2dmpi/linear.hpp"
 #include "../hydro2dmpi/solver.hpp"
 #include <memory>
+#include <function>
 
 // TODO: Change parameters on events (e.g. certain time moments)
 
@@ -48,6 +49,42 @@ class HeatStorage : public solver::UnsteadySolver {
 
   using Layers = solver::Layers;
 
+  using FuncRhs = std::function<Scal(Scal, Scal)>;
+
+  static Scal RhsCos(Scal t, Scal x) {
+    return std::cos(x);
+  }
+
+  class TesterMms {
+   public:
+    struct Diff {
+      size_t num_cells;
+      Scal diff;
+      Scal h;
+    };
+    TesterMms(size_t num_cells_initial, size_t num_stages, size_t factor,
+              Scal domain_length, size_t num_steps) {
+      for (size_t num_cells = num_cells_initial, i = 0;
+          i < num_stages; ++i, num_cells *= factor) {
+        solvers_.emplace_back(num_cells, domain_length);
+        auto& solver = solvers_.back();
+        for (size_t n = 0; n < num_steps; ++n) {
+          solver.StartStep();
+          solver.CalcStep();
+          solver.FinishStep();
+        }
+      }
+    }
+    const std::vector<Diff>& GetDiffSeries() const {
+      return diff_series_;
+    }
+
+   private:
+    std::vector<HeatStorage> solvers_;
+    std::vector<Diff> diff_series_;
+  };
+
+
   template <class T>
   using FieldCell = geom::FieldCell<T>;
   template <class T>
@@ -77,6 +114,7 @@ class HeatStorage : public solver::UnsteadySolver {
     return fc_temperature_fluid_.time_curr;
   }
   void CalcStep() {}
+  const Mesh& GetMesh() const { return mesh; }
 
  private:
   Mesh mesh;
