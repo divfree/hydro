@@ -80,8 +80,9 @@ class HeatStorage : public solver::UnsteadySolver {
           solver.StartStep();
           solver.CalcStep();
           solver.FinishStep();
-          std::cout << num_cells << std::endl;
         }
+        solver.WriteField(solver.GetFluidTemperature(),
+                          "field_T_fluid_" + IntToStr(num_cells) + ".dat");
       }
     }
     const std::vector<Diff>& GetDiffSeries() const {
@@ -147,18 +148,24 @@ class HeatStorage : public solver::UnsteadySolver {
     fc_temperature_fluid_.time_prev.Reinit(mesh, 0.);
     fc_temperature_solid_.time_curr.Reinit(mesh, 0.);
     fc_temperature_solid_.time_prev.Reinit(mesh, 0.);
-
-
-    std::ofstream f("mesh" + IntToStr(num_cells));
-    for (auto idxcell : mesh.Cells()) {
-      f << mesh.GetVolume(idxcell) << " ";
-    }
   }
   const FieldCell<Scal>& GetFluidTemperature(Layers layer) {
     return fc_temperature_fluid_.Get(layer);
   }
   const FieldCell<Scal>& GetFluidTemperature() {
     return fc_temperature_fluid_.time_curr;
+  }
+  void WriteField(const FieldCell<Scal>& fc_u, std::string filename) const {
+    output::Content content = {
+        std::make_shared<output::EntryFunction<Scal, IdxNode, Mesh>>(
+            "x", mesh,
+            [this](IdxNode idx) { return mesh.GetNode(idx)[0]; })
+        , std::make_shared<output::EntryFunction<Scal, IdxCell, Mesh>>(
+            "u", mesh,
+            [&](IdxCell idx) { return fc_u[idx]; })
+    };
+    output::SessionPlain<Mesh> session(content, filename, mesh);
+    session.Write(0., "field");
   }
   void CalcStep() {
     auto& tf = fc_temperature_fluid_.time_prev;
@@ -307,9 +314,18 @@ hydro<Mesh>::hydro(TExperiment* _ex)
   session->Write(0., "initial");
   session_scalar->Write();
 
-  typename HeatStorage<Mesh>::TesterMms tester(
-      4, 4, 2, 1., 1000, dt,
-      P_double["uf"], P_double["alpha"], P_double["T_left"]);
+  if (flag("MMS")) {
+    typename HeatStorage<Mesh>::TesterMms tester(
+        P_int["MMS_mesh_initial"],
+        P_int["MMS_num_stages"],
+        P_int["MMS_factor"],
+        P_double["MMS_domain_length"],
+        P_int["MMS_num_steps"],
+        P_double["MMS_time_step"],
+        P_double["MMS_fluid_velocity"],
+        P_double["MMS_alpha"],
+        P_double["MMS_T_left"]);
+  }
 }
 
 template <class Mesh>
