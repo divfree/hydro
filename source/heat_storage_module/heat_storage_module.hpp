@@ -56,10 +56,15 @@ class HeatStorage : public solver::UnsteadySolver {
   template <class T>
   using FieldNode = geom::FieldNode<T>;
 
-  using FuncRhs = std::function<Scal(Scal, Scal)>;
+  using FuncTX = std::function<Scal(Scal, Scal)>;
 
-  static Scal RhsCos(Scal t, Scal x) {
-    return std::cos(x);
+  static FieldCell<Scal> Evaluate(FuncTX func, double t, const Mesh& mesh) {
+    FieldCell<Scal> res(mesh);
+    for (auto idxcell : mesh.Cells()) {
+      Scal x = mesh.GetCenter(idxcell)[0];
+      res[idxcell] = func(t, x);
+    }
+    return res;
   }
 
   class TesterMms {
@@ -71,16 +76,29 @@ class HeatStorage : public solver::UnsteadySolver {
     };
     TesterMms(size_t num_cells_initial, size_t num_stages, size_t factor,
               Scal domain_length, size_t num_steps, double time_step,
-              Scal fluid_velocity, Scal conductivity, Scal Tleft) {
+              Scal fluid_velocity, Scal conductivity, Scal Tleft,
+              FuncTX rhs_fluid, FuncTX func_exact_fluid_temperature) {
+      std::ofstream stat("mms_statistics.dat");
+      stat << "num_cells exact_error diff" << std::endl;
       for (size_t num_cells = num_cells_initial, i = 0;
           i < num_stages; ++i, num_cells *= factor) {
-        solvers_.emplace_back(num_cells, domain_length, time_step, fluid_velocity, conductivity, Tleft);
+
+        // Create mesh
+        Mesh mesh;
+        MIdx mesh_size(num_cells);
+        geom::Rect<Vect> domain(Vect(0.), Vect(domain_length));
+        geom::InitUniformMesh(mesh, domain, mesh_size);
+
+        FieldCell<Scal> fc_rhs_fluid(mesh, 0.), fc_rhs_solid(mesh, 0.);
+        fc_rhs_fluid = Evaluate(rhs_fluid, 0., mesh);
+        solvers_.emplace_back(mesh, time_step, fluid_velocity, conductivity, Tleft, &fc_rhs_fluid, &fc_rhs_solid);
         auto& solver = solvers_.back();
         for (size_t n = 0; n < num_steps; ++n) {
           solver.StartStep();
           solver.CalcStep();
           solver.FinishStep();
         }
+
         solver.WriteField(solver.GetFluidTemperature(),
                           "field_T_fluid_" + IntToStr(num_cells) + ".dat");
       }
@@ -125,23 +143,18 @@ class HeatStorage : public solver::UnsteadySolver {
     double d1_, d2_, d3_, d4_;
   };
 
-  HeatStorage(size_t num_cells, Scal domain_length, double time_step,
-              double fluid_velocity, double conductivity, double Tleft)
+  HeatStorage(const Mesh& mesh, double time_step,
+              double fluid_velocity, double conductivity, double Tleft,
+              const FieldCell<Scal>* p_fc_rhs_fluid, const FieldCell<Scal>* p_fc_rhs_solid)
       : UnsteadySolver(0., time_step),
-        fluid_velocity_(fluid_velocity), conductivity_(conductivity), Tleft_(Tleft) {
+        mesh(mesh),
+        fluid_velocity_(fluid_velocity), conductivity_(conductivity), Tleft_(Tleft),
+        p_fc_rhs_fluid_(p_fc_rhs_fluid), p_fc_rhs_solid_(p_fc_rhs_solid)
+        {
 
     //,
     //      scheduler_(P_double["duration_1"], P_double["duration_2"],
     //                 P_double["duration_3"], P_double["duration_4"])
-
-    // Prepare mesh nodes
-    MIdx mesh_size(num_cells);
-
-    geom::Rect<Vect> domain(Vect(0.), Vect(domain_length));
-
-    //auto domain_size = domain.GetDimensions();
-    // Create mesh
-    geom::InitUniformMesh(mesh, domain, mesh_size);
 
     // Init fields
     fc_temperature_fluid_.time_curr.Reinit(mesh, 0.);
@@ -181,29 +194,50 @@ class HeatStorage : public solver::UnsteadySolver {
     const Scal alpha = conductivity_;
     const Scal Tleft = Tleft_;
 
-    for (IdxCell c : mesh.Cells()) {
-      IdxCell cm = mesh.GetNeighbourCell(c, 0);
-      IdxCell cp = mesh.GetNeighbourCell(c, 1);
+    // Equation: dT/dt + div(fluxes) = 0
+    FieldFace<Scal> ff_flux_fluid(mesh, 0.);
+    for (IdxFace idxface : mesh.Faces()) {
+      IdxCell cm = mesh.GetNeighbourCell(idxface, 0);
+      IdxCell cp = mesh.GetNeighbourCell(idxface, 1);
+      auto& flux = ff_flux_fluid[idxface];
       if (cm.IsNone()) { // left boundary
-        tf_new[c] = tf[c] - dt * uf * (tf[c] - Tleft) / h
-            + dt * alpha * (-tf[c] + tf[cp]) / sqr(h);
+        flux = uf * Tleft;
       } else if (cp.IsNone()) { // right boundary
-        tf_new[c] = tf[c] - dt * uf * (tf[c] - tf[cm]) / h
-            + dt * alpha * (tf[cm] - tf[c]) / sqr(h);
+        flux = uf * tf[cm];
       } else {
-        tf_new[c] = tf[c] - dt * uf * (tf[c] - tf[cm]) / h
-            + dt * alpha * (tf[cm] - 2. * tf[c] + tf[cp]) / sqr(h);
+        // convection: first order upwind
+        flux += uf * tf[cm];
+        // diffusion: central second order
+        flux += -alpha * (tf[cp] - tf[cm]) / h;
       }
+    }
+
+    for (IdxCell idxcell : mesh.Cells()) {
+      IdxFace fm = mesh.GetNeighbourFace(idxcell, 0);
+      IdxFace fp = mesh.GetNeighbourFace(idxcell, 1);
+      Scal fluxsum = ff_flux_fluid[fp] - ff_flux_fluid[fm];
+      tf_new[idxcell] = tf[idxcell] - dt / h * fluxsum + dt * (*p_fc_rhs_fluid_)[idxcell];
+//      if (cm.IsNone()) { // left boundary
+//        tf_new[c] = tf[c] - dt * uf * (tf[c] - Tleft) / h
+//            + dt * alpha * (-tf[c] + tf[cp]) / sqr(h);
+//      } else if (cp.IsNone()) { // right boundary
+//        tf_new[c] = tf[c] - dt * uf * (tf[c] - tf[cm]) / h
+//            + dt * alpha * (tf[cm] - tf[c]) / sqr(h);
+//      } else {
+//        tf_new[c] = tf[c] - dt * uf * (tf[c] - tf[cm]) / h
+//            + dt * alpha * (tf[cm] - 2. * tf[c] + tf[cp]) / sqr(h);
+//      }
     }
   }
   const Mesh& GetMesh() const { return mesh; }
 
  private:
-  Mesh mesh;
+  const Mesh& mesh;
   solver::LayersData<FieldCell<Scal>>
   fc_temperature_fluid_, fc_temperature_solid_;
   Scal fluid_velocity_, conductivity_, Tleft_;
-  //Scheduler scheduler_;
+  const FieldCell<Scal>* p_fc_rhs_fluid_;
+  const FieldCell<Scal>* p_fc_rhs_solid_;
 };
 
 template <class Mesh>
@@ -243,7 +277,7 @@ class hydro : public TModule
   double last_frame_scalar_time_;
 
   std::shared_ptr<HeatStorage<Mesh>> solver_;
-  const Mesh * pmesh;
+  Mesh mesh;
 };
 
 template <class Mesh>
@@ -263,20 +297,22 @@ hydro<Mesh>::hydro(TExperiment* _ex)
   geom::Rect<Vect> domain(GetVect<Vect>(P_vect["A"]),
                           GetVect<Vect>(P_vect["B"]));
 
+  // Create mesh
+  MIdx mesh_size(P_int["Nx"]);
+  geom::InitUniformMesh(mesh, domain, mesh_size);
+
   solver_ = std::make_shared<HeatStorage<Mesh>>(
-      P_int["Nx"], domain.GetDimensions()[0], dt,
-      P_double["uf"], P_double["alpha"], P_double["T_left"]);
+      mesh, dt,
+      P_double["uf"], P_double["alpha"], P_double["T_left"], nullptr, nullptr);
 
-  pmesh = &solver_->GetMesh();
-
-  P_int.set("cells_number", static_cast<int>(pmesh->GetNumCells()));
+  P_int.set("cells_number", static_cast<int>(mesh.GetNumCells()));
 
   content = {
       std::make_shared<output::EntryFunction<Scal, IdxNode, Mesh>>(
-          "x", *pmesh,
-          [this](IdxNode idx) { return pmesh->GetNode(idx)[0]; })
+          "x", mesh,
+          [this](IdxNode idx) { return mesh.GetNode(idx)[0]; })
 //      , std::make_shared<output::EntryFunction<Scal, IdxCell, Mesh>>(
-//          "tf", *pmesh,
+//          "tf", mesh,
 //          [this](IdxCell idx) { return fc_temperature_fluid_.time_curr[idx]; })
   };
 
@@ -304,7 +340,7 @@ hydro<Mesh>::hydro(TExperiment* _ex)
   }
 
   session = std::make_shared<output::SessionPlain<Mesh>>(
-      content, P_string["filename_field"], *pmesh);
+      content, P_string["filename_field"], mesh);
 
   session_scalar = std::make_shared<output::SessionPlainScalar<Scal>>(
       content_scalar, P_string["filename_scalar"]);
@@ -313,6 +349,9 @@ hydro<Mesh>::hydro(TExperiment* _ex)
   last_frame_scalar_time_ = 0;
   session->Write(0., "initial");
   session_scalar->Write();
+
+  auto func_rhs = [](Scal, Scal x) { return std::cos(x); };
+  auto func_exact = [](Scal, Scal x) { return std::cos(x); };
 
   if (flag("MMS")) {
     typename HeatStorage<Mesh>::TesterMms tester(
@@ -324,7 +363,8 @@ hydro<Mesh>::hydro(TExperiment* _ex)
         P_double["MMS_time_step"],
         P_double["MMS_fluid_velocity"],
         P_double["MMS_alpha"],
-        P_double["MMS_T_left"]);
+        P_double["MMS_T_left"],
+        func_rhs, func_exact);
   }
 }
 
