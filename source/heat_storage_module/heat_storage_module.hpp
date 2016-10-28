@@ -77,7 +77,7 @@ class HeatStorage : public solver::UnsteadySolver {
     TesterMms(size_t num_cells_initial, size_t num_stages, size_t factor,
               Scal domain_length, size_t num_steps, double time_step,
               Scal fluid_velocity, Scal conductivity, Scal Tleft,
-              FuncTX rhs_fluid, FuncTX func_exact_fluid_temperature) {
+              FuncTX func_rhs_fluid, FuncTX func_exact_fluid_temperature) {
       std::ofstream stat("mms_statistics.dat");
       stat << "num_cells exact_error diff" << std::endl;
       for (size_t num_cells = num_cells_initial, i = 0;
@@ -90,7 +90,7 @@ class HeatStorage : public solver::UnsteadySolver {
         geom::InitUniformMesh(mesh, domain, mesh_size);
 
         FieldCell<Scal> fc_rhs_fluid(mesh, 0.), fc_rhs_solid(mesh, 0.);
-        fc_rhs_fluid = Evaluate(rhs_fluid, 0., mesh);
+        fc_rhs_fluid = Evaluate(func_rhs_fluid, 0., mesh);
         solvers_.emplace_back(mesh, time_step, fluid_velocity, conductivity, Tleft, &fc_rhs_fluid, &fc_rhs_solid);
         auto& solver = solvers_.back();
         for (size_t n = 0; n < num_steps; ++n) {
@@ -99,8 +99,13 @@ class HeatStorage : public solver::UnsteadySolver {
           solver.FinishStep();
         }
 
+        FieldCell<Scal> fc_exact = Evaluate(func_exact_fluid_temperature, 0., mesh);
+        Scal diffmax = solver::CalcDiff(fc_exact, solver.GetFluidTemperature(), mesh);
+        stat << num_cells << ' ' << diffmax << std::endl;
+
         solver.WriteField(solver.GetFluidTemperature(),
                           "field_T_fluid_" + IntToStr(num_cells) + ".dat");
+
       }
     }
     const std::vector<Diff>& GetDiffSeries() const {
