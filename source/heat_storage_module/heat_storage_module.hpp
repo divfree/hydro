@@ -350,21 +350,26 @@ hydro<Mesh>::hydro(TExperiment* _ex)
   session->Write(0., "initial");
   session_scalar->Write();
 
-  auto func_rhs = [](Scal, Scal x) { return std::cos(x); };
-  auto func_exact = [](Scal, Scal x) { return std::cos(x); };
 
-  if (flag("MMS")) {
-    typename HeatStorage<Mesh>::TesterMms tester(
-        P_int["MMS_mesh_initial"],
-        P_int["MMS_num_stages"],
-        P_int["MMS_factor"],
-        P_double["MMS_domain_length"],
-        P_int["MMS_num_steps"],
-        P_double["MMS_time_step"],
-        P_double["MMS_fluid_velocity"],
-        P_double["MMS_alpha"],
-        P_double["MMS_T_left"],
-        func_rhs, func_exact);
+  {
+    const Scal uf = P_double["MMS_fluid_velocity"];
+    const Scal alpha = P_double["MMS_alpha"];
+    auto func_exact = [](Scal, Scal x) { return std::cos(x); };
+    auto func_rhs = [=](Scal, Scal x) { return -uf * std::sin(x) + alpha * std::cos(x); };
+
+    if (flag("MMS")) {
+      typename HeatStorage<Mesh>::TesterMms tester(
+          P_int["MMS_mesh_initial"],
+          P_int["MMS_num_stages"],
+          P_int["MMS_factor"],
+          P_double["MMS_domain_length"],
+          P_int["MMS_num_steps"],
+          P_double["MMS_time_step"],
+          P_double["MMS_fluid_velocity"],
+          P_double["MMS_alpha"],
+          P_double["MMS_T_left"],
+          func_rhs, func_exact);
+    }
   }
 }
 
