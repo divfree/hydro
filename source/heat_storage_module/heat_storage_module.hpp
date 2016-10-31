@@ -69,17 +69,20 @@ class HeatStorage : public solver::UnsteadySolver {
 
   class TesterMms {
    public:
-    struct Diff {
-      size_t num_cells;
-      Scal diff;
+    struct Entry {
+      Scal diff_prev;
+      Scal error;
       Scal h;
+      Mesh mesh;
+      FieldCell<Scal> fc_fluid_temperature;
+      FieldCell<Scal> fc_exact_fluid_temperature;
     };
     TesterMms(size_t num_cells_initial, size_t num_stages, size_t factor,
               Scal domain_length, size_t num_steps, double time_step,
               Scal fluid_velocity, Scal conductivity, Scal Tleft,
               FuncTX func_rhs_fluid, FuncTX func_exact_fluid_temperature) {
       std::ofstream stat("mms_statistics.dat");
-      stat << "num_cells exact_error diff" << std::endl;
+      stat << "num_cells error diff" << std::endl;
       for (size_t num_cells = num_cells_initial, i = 0;
           i < num_stages; ++i, num_cells *= factor) {
 
@@ -99,22 +102,35 @@ class HeatStorage : public solver::UnsteadySolver {
           solver.FinishStep();
         }
 
-        FieldCell<Scal> fc_exact = Evaluate(func_exact_fluid_temperature, 0., mesh);
-        Scal diffmax = solver::CalcDiff(fc_exact, solver.GetFluidTemperature(), mesh);
-        stat << num_cells << ' ' << diffmax << std::endl;
+        Entry entry;
+        entry.mesh = mesh;
+
+        entry.fc_fluid_temperature = solver.GetFluidTemperature();
+        entry.diff_prev = series_.empty() ? 0. :
+            solver::CalcDiff(entry.fc_fluid_temperature,
+                             GetInterpolated(series_.back().fc_fluid_temperature, series_.back().mesh, mesh),
+                             mesh);
+
+        entry.fc_exact_fluid_temperature = Evaluate(func_exact_fluid_temperature, 0., mesh);
+        entry.error = solver::CalcDiff(entry.fc_exact_fluid_temperature,
+                                       entry.fc_fluid_temperature,
+                                       mesh);
+
+        series_.push_back(entry);
+
+        stat << num_cells << ' ' << entry.error << ' ' << entry.diff_prev << std::endl;
 
         solver.WriteField(solver.GetFluidTemperature(),
                           "field_T_fluid_" + IntToStr(num_cells) + ".dat");
-
       }
     }
-    const std::vector<Diff>& GetDiffSeries() const {
-      return diff_series_;
+    const std::vector<Entry>& GetSeries() const {
+      return series_;
     }
 
    private:
     std::vector<HeatStorage> solvers_;
-    std::vector<Diff> diff_series_;
+    std::vector<Entry> series_;
   };
 
   class Scheduler {
@@ -183,7 +199,7 @@ class HeatStorage : public solver::UnsteadySolver {
 	  IdxCell idx_left_src = IdxCell(0);
 	  IdxCell idx_right_src = idx_left_src;
 	  for (IdxCell idx_dest : mesh_dest.Cells()) {
-	    Vect x_dest = mesh_dest.GetCenter(idx_dest)[0];
+	    Scal x_dest = mesh_dest.GetCenter(idx_dest)[0];
 	    while (mesh_src.GetCenter(idx_right_src)[0] < x_dest) {
 	      IdxCell idx_new_src = mesh_src.GetNeighbourCell(idx_right_src, 1);
 	      if (idx_new_src.IsNone()) {
@@ -192,7 +208,7 @@ class HeatStorage : public solver::UnsteadySolver {
 	      idx_left_src = idx_right_src;
 	      idx_right_src = idx_new_src;
 	    }
-	    res[idx_dest] = GetInterpolated(x_dest, mesh_src.GetCenter(idx_left_src), mesh_src.GetCenter(idx_right_src),
+	    res[idx_dest] = GetInterpolated(x_dest, mesh_src.GetCenter(idx_left_src)[0], mesh_src.GetCenter(idx_right_src)[0],
 	                                    fc_src[idx_left_src], fc_src[idx_right_src]);
 	  }
 	  return res;
