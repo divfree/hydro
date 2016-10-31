@@ -173,6 +173,30 @@ class HeatStorage : public solver::UnsteadySolver {
   const FieldCell<Scal>& GetFluidTemperature() {
     return fc_temperature_fluid_.time_curr;
   }
+  static Scal GetInterpolated(Scal x, Scal x_left, Scal x_right, Scal u_left, Scal u_right) {
+    return ((x - x_left) * u_right + (x_right - x) * u_left) / (x_right - x_left);
+  }
+  // Applies linear interpolation on 1D mesh
+  static FieldCell<Scal> GetInterpolated(const FieldCell<Scal>& fc_src, const Mesh& mesh_src, const Mesh& mesh_dest) {
+	  static_assert(Mesh::dim == 1, "HeatStorage::GetInterpolated() requires a 1D mesh");
+	  FieldCell<Scal> res(mesh_dest);
+	  IdxCell idx_left_src = IdxCell(0);
+	  IdxCell idx_right_src = idx_left_src;
+	  for (IdxCell idx_dest : mesh_dest.Cells()) {
+	    Vect x_dest = mesh_dest.GetCenter(idx_dest)[0];
+	    while (mesh_src.GetCenter(idx_right_src)[0] < x_dest) {
+	      IdxCell idx_new_src = mesh_src.GetNeighbourCell(idx_right_src, 1);
+	      if (idx_new_src.IsNone()) {
+	        break;
+	      }
+	      idx_left_src = idx_right_src;
+	      idx_right_src = idx_new_src;
+	    }
+	    res[idx_dest] = GetInterpolated(x_dest, mesh_src.GetCenter(idx_left_src), mesh_src.GetCenter(idx_right_src),
+	                                    fc_src[idx_left_src], fc_src[idx_right_src]);
+	  }
+	  return res;
+  }
   void WriteField(const FieldCell<Scal>& fc_u, std::string filename) const {
     output::Content content = {
         std::make_shared<output::EntryFunction<Scal, IdxNode, Mesh>>(
@@ -222,16 +246,6 @@ class HeatStorage : public solver::UnsteadySolver {
       IdxFace fp = mesh.GetNeighbourFace(idxcell, 1);
       Scal fluxsum = ff_flux_fluid[fp] - ff_flux_fluid[fm];
       tf_new[idxcell] = tf[idxcell] - dt / h * fluxsum + dt * (*p_fc_rhs_fluid_)[idxcell];
-//      if (cm.IsNone()) { // left boundary
-//        tf_new[c] = tf[c] - dt * uf * (tf[c] - Tleft) / h
-//            + dt * alpha * (-tf[c] + tf[cp]) / sqr(h);
-//      } else if (cp.IsNone()) { // right boundary
-//        tf_new[c] = tf[c] - dt * uf * (tf[c] - tf[cm]) / h
-//            + dt * alpha * (tf[cm] - tf[c]) / sqr(h);
-//      } else {
-//        tf_new[c] = tf[c] - dt * uf * (tf[c] - tf[cm]) / h
-//            + dt * alpha * (tf[cm] - 2. * tf[c] + tf[cp]) / sqr(h);
-//      }
     }
   }
   const Mesh& GetMesh() const { return mesh; }
