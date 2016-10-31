@@ -215,9 +215,9 @@ class HeatStorage : public solver::UnsteadySolver {
   }
   void WriteField(const FieldCell<Scal>& fc_u, std::string filename) const {
     output::Content content = {
-        std::make_shared<output::EntryFunction<Scal, IdxNode, Mesh>>(
+        std::make_shared<output::EntryFunction<Scal, IdxCell, Mesh>>(
             "x", mesh,
-            [this](IdxNode idx) { return mesh.GetNode(idx)[0]; })
+            [this](IdxCell idx) { return mesh.GetCenter(idx)[0]; })
         , std::make_shared<output::EntryFunction<Scal, IdxCell, Mesh>>(
             "u", mesh,
             [&](IdxCell idx) { return fc_u[idx]; })
@@ -389,8 +389,12 @@ hydro<Mesh>::hydro(TExperiment* _ex)
   {
     const Scal uf = P_double["MMS_fluid_velocity"];
     const Scal alpha = P_double["MMS_alpha"];
-    auto func_exact = [](Scal, Scal x) { return std::cos(x); };
-    auto func_rhs = [=](Scal, Scal x) { return -uf * std::sin(x) + alpha * std::cos(x); };
+    const Scal wavenumber = P_double["MMS_wavenumber"];
+    auto func_exact = [=](Scal, Scal x) { return std::cos(x * wavenumber); };
+    auto func_rhs = [=](Scal, Scal x) {
+      return -uf * wavenumber * std::sin(x * wavenumber) +
+          alpha * sqr(wavenumber) * std::cos(x * wavenumber);
+    };
 
     if (flag("MMS")) {
       typename HeatStorage<Mesh>::TesterMms tester(
