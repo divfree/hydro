@@ -319,7 +319,23 @@ class HeatStorage : public solver::UnsteadySolver {
     }
 
     // Implicit heat exchange
-
+    const Scal hf = exchange_fluid_;
+    const Scal hs = exchange_solid_;
+    const Scal a = 1. + hf * dt;
+    const Scal b = -hf * dt;
+    const Scal c = -hs * dt;
+    const Scal d = 1. + hs * dt;
+    const Scal det = a * d - b * c;
+    const Scal ai = d / det;
+    const Scal bi = -b / det;
+    const Scal ci = -c / det;
+    const Scal di = a / det;
+    for (IdxCell idxcell : mesh.Cells()) {
+      const Scal tf = Tf_new[idxcell];
+      const Scal ts = Ts_new[idxcell];
+      Tf_new[idxcell] = ai * tf + bi * ts;
+      Ts_new[idxcell] = ci * tf + di * ts;
+    }
   }
   const Mesh& GetMesh() const { return mesh; }
 
