@@ -282,14 +282,14 @@ class HeatStorage : public solver::UnsteadySolver {
       auto& flux_fluid = ff_flux_fluid[idxface];
       auto& flux_solid = ff_flux_solid[idxface];
       if (cm.IsNone()) { // left boundary
-        flux_fluid += uf * T_in;
+        flux_fluid += uf * (uf > 0. ? T_in : Tf[cp]);
         flux_solid += 0.;
       } else if (cp.IsNone()) { // right boundary
-        flux_fluid += uf * Tf[cm];
+        flux_fluid += uf * (uf < 0. ? T_in : Tf[cm]);
         flux_solid += 0.;
       } else {
         // convection: first order upwind
-        flux_fluid += uf * Tf[cm];
+        flux_fluid += uf * (uf > 0. ? Tf[cm] : Tf[cp]);
         // diffusion: central second order
         flux_fluid += -alpha_f * (Tf[cp] - Tf[cm]) / h;
         flux_solid += -alpha_s * (Ts[cp] - Ts[cm]) / h;
