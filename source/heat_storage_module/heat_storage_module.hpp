@@ -76,6 +76,7 @@ class HeatStorage : public solver::UnsteadySolver {
       Mesh mesh;
       FieldCell<Scal> fc_fluid_temperature;
       FieldCell<Scal> fc_exact_fluid_temperature;
+      std::shared_ptr<HeatStorage> solver;
     };
     TesterMms(size_t num_cells_initial, size_t num_stages, size_t factor,
               Scal domain_length, size_t num_steps, double time_step,
@@ -86,19 +87,23 @@ class HeatStorage : public solver::UnsteadySolver {
       stat.precision(20);
       stat << "num_cells error diff dt num_steps step_diff" << std::endl;
       
+      std::string field_name_prefix = "field_T_fluid_";
+
       for (size_t num_cells = num_cells_initial, i = 0;
           i < num_stages; ++i, num_cells *= factor) {
+        series_.emplace_back();
+        Entry& entry = series_.back();
 
         // Create mesh
-        Mesh mesh;
+        Mesh& mesh = entry.mesh;
         MIdx mesh_size(num_cells);
         geom::Rect<Vect> domain(Vect(0.), Vect(domain_length));
         geom::InitUniformMesh(mesh, domain, mesh_size);
 
         FieldCell<Scal> fc_rhs_fluid(mesh, 0.), fc_rhs_solid(mesh, 0.);
         fc_rhs_fluid = Evaluate(func_rhs_fluid, 0., mesh);
-        solvers_.emplace_back(mesh, time_step, fluid_velocity, conductivity, Tleft, &fc_rhs_fluid, &fc_rhs_solid);
-        auto& solver = solvers_.back();
+        entry.solver = std::make_shared<HeatStorage>(mesh, time_step, fluid_velocity, conductivity, Tleft, &fc_rhs_fluid, &fc_rhs_solid);
+        auto& solver = *entry.solver;
         size_t actual_num_steps = num_steps;
         for (size_t n = 0; n < num_steps; ++n) {
           solver.StartStep();
@@ -111,9 +116,6 @@ class HeatStorage : public solver::UnsteadySolver {
           }
         }
 
-        Entry entry;
-        entry.mesh = mesh;
-
         entry.fc_fluid_temperature = solver.GetFluidTemperature();
         entry.diff_prev = series_.empty() ? 0. :
             solver::CalcDiff(entry.fc_fluid_temperature,
@@ -124,8 +126,6 @@ class HeatStorage : public solver::UnsteadySolver {
         entry.error = solver::CalcDiff(entry.fc_exact_fluid_temperature,
                                        entry.fc_fluid_temperature,
                                        mesh);
-
-        series_.push_back(entry);
         
         const Scal step_diff = 
             solver::CalcDiff(solver.GetFluidTemperature(Layers::time_curr),
@@ -135,7 +135,14 @@ class HeatStorage : public solver::UnsteadySolver {
             << time_step << ' ' << actual_num_steps << ' ' << step_diff << std::endl;
 
         solver.WriteField(solver.GetFluidTemperature(),
-                          "field_T_fluid_" + IntToStr(num_cells) + ".dat");
+                          field_name_prefix + IntToStr(num_cells) + ".dat");
+      }
+
+      // Write the exact solution on the finest mesh
+      if (!series_.empty()) {
+        auto& entry = series_.back();
+        entry.solver->WriteField(entry.fc_exact_fluid_temperature,
+                                 field_name_prefix + "exact" + ".dat");
       }
     }
     const std::vector<Entry>& GetSeries() const {
@@ -143,7 +150,6 @@ class HeatStorage : public solver::UnsteadySolver {
     }
 
    private:
-    std::vector<HeatStorage> solvers_;
     std::vector<Entry> series_;
   };
 
@@ -404,11 +410,28 @@ hydro<Mesh>::hydro(TExperiment* _ex)
     const Scal uf = P_double["MMS_fluid_velocity"];
     const Scal alpha = P_double["MMS_alpha"];
     const Scal wavenumber = P_double["MMS_wavenumber"];
-    auto func_exact = [=](Scal, Scal x) { return std::cos(x * wavenumber); };
-    auto func_rhs = [=](Scal, Scal x) {
-      return -uf * wavenumber * std::sin(x * wavenumber) +
-          alpha * sqr(wavenumber) * std::cos(x * wavenumber);
-    };
+
+    using FuncTX = typename HeatStorage<Mesh>::FuncTX;
+    FuncTX func_exact, func_rhs;
+
+    const std::string mmsfunc = P_string["MMS_exact_solution"];
+    if (mmsfunc == "cos(kx)") {
+      func_exact = [=](Scal, Scal x) { return std::cos(x * wavenumber); };
+      func_rhs = [=](Scal, Scal x) {
+        return -uf * wavenumber * std::sin(x * wavenumber) +
+            alpha * sqr(wavenumber) * std::cos(x * wavenumber);
+      };
+    } else if (mmsfunc == "cos(kx^2)") {
+      func_exact = [=](Scal, Scal x) { return std::cos(sqr(x) * wavenumber); };
+      func_rhs = [=](Scal, Scal x) {
+        return -uf * wavenumber * 2. * x * std::sin(sqr(x) * wavenumber) +
+            alpha * (sqr(wavenumber) * 4. * sqr(x) * std::cos(sqr(x) * wavenumber) +
+                    wavenumber * 2. * std::sin(sqr(x) * wavenumber));
+      };
+    } else {
+      throw std::string("Unknown MMS_exact_solution: " + mmsfunc);
+    }
+
 
     if (flag("MMS")) {
       typename HeatStorage<Mesh>::TesterMms tester(
