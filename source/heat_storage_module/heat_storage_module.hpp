@@ -79,10 +79,13 @@ class HeatStorage : public solver::UnsteadySolver {
     };
     TesterMms(size_t num_cells_initial, size_t num_stages, size_t factor,
               Scal domain_length, size_t num_steps, double time_step,
+              Scal step_threshold,
               Scal fluid_velocity, Scal conductivity, Scal Tleft,
               FuncTX func_rhs_fluid, FuncTX func_exact_fluid_temperature) {
       std::ofstream stat("mms_statistics.dat");
-      stat << "num_cells error diff" << std::endl;
+      stat.precision(20);
+      stat << "num_cells error diff dt num_steps step_diff" << std::endl;
+      
       for (size_t num_cells = num_cells_initial, i = 0;
           i < num_stages; ++i, num_cells *= factor) {
 
@@ -96,10 +99,16 @@ class HeatStorage : public solver::UnsteadySolver {
         fc_rhs_fluid = Evaluate(func_rhs_fluid, 0., mesh);
         solvers_.emplace_back(mesh, time_step, fluid_velocity, conductivity, Tleft, &fc_rhs_fluid, &fc_rhs_solid);
         auto& solver = solvers_.back();
+        size_t actual_num_steps = num_steps;
         for (size_t n = 0; n < num_steps; ++n) {
           solver.StartStep();
           solver.CalcStep();
           solver.FinishStep();
+          if (solver::CalcDiff(solver.GetFluidTemperature(Layers::time_curr),
+                               solver.GetFluidTemperature(Layers::time_prev), mesh) < step_threshold) {
+            actual_num_steps = n;
+            break;
+          }
         }
 
         Entry entry;
@@ -117,8 +126,13 @@ class HeatStorage : public solver::UnsteadySolver {
                                        mesh);
 
         series_.push_back(entry);
+        
+        const Scal step_diff = 
+            solver::CalcDiff(solver.GetFluidTemperature(Layers::time_curr),
+                             solver.GetFluidTemperature(Layers::time_prev), mesh);
 
-        stat << num_cells << ' ' << entry.error << ' ' << entry.diff_prev << std::endl;
+        stat << num_cells << ' ' << entry.error << ' ' << entry.diff_prev 
+            << time_step << ' ' << actual_num_steps << ' ' << step_diff << std::endl;
 
         solver.WriteField(solver.GetFluidTemperature(),
                           "field_T_fluid_" + IntToStr(num_cells) + ".dat");
@@ -404,6 +418,7 @@ hydro<Mesh>::hydro(TExperiment* _ex)
           P_double["MMS_domain_length"],
           P_int["MMS_num_steps"],
           P_double["MMS_time_step"],
+          P_double["MMS_step_threshold"],
           P_double["MMS_fluid_velocity"],
           P_double["MMS_alpha"],
           P_double["MMS_T_left"],
