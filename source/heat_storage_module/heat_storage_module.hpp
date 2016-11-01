@@ -203,16 +203,22 @@ class HeatStorage : public solver::UnsteadySolver {
     //                 P_double["duration_3"], P_double["duration_4"])
 
     // Init fields
-    fc_temperature_fluid_.time_curr.Reinit(mesh, 0.);
-    fc_temperature_fluid_.time_prev.Reinit(mesh, 0.);
-    fc_temperature_solid_.time_curr.Reinit(mesh, 0.);
-    fc_temperature_solid_.time_prev.Reinit(mesh, 0.);
+    fc_temperature_fluid_.time_curr.Reinit(mesh, temperature_cold_);
+    fc_temperature_fluid_.time_prev.Reinit(mesh, temperature_cold_);
+    fc_temperature_solid_.time_curr.Reinit(mesh, temperature_cold_);
+    fc_temperature_solid_.time_prev.Reinit(mesh, temperature_cold_);
   }
-  const FieldCell<Scal>& GetFluidTemperature(Layers layer) {
+  const FieldCell<Scal>& GetFluidTemperature(Layers layer) const {
     return fc_temperature_fluid_.Get(layer);
   }
-  const FieldCell<Scal>& GetFluidTemperature() {
+  const FieldCell<Scal>& GetFluidTemperature() const {
     return fc_temperature_fluid_.time_curr;
+  }
+  const FieldCell<Scal>& GetSolidTemperature(Layers layer) const {
+    return fc_temperature_solid_.Get(layer);
+  }
+  const FieldCell<Scal>& GetSolidTemperature() const {
+    return fc_temperature_solid_.time_curr;
   }
   static Scal GetInterpolated(Scal x, Scal x_left, Scal x_right, Scal u_left, Scal u_right) {
     return ((x - x_left) * u_right + (x_right - x) * u_left) / (x_right - x_left);
@@ -258,7 +264,7 @@ class HeatStorage : public solver::UnsteadySolver {
     auto& Ts_new = fc_temperature_solid_.time_curr;
     std::swap(Ts, Ts_new);
 
-    const Scal h = mesh.GetVolume(IdxCell(0));
+    const Scal h = mesh.GetVolume(IdxCell(0)); // uniform mesh assumed
     const Scal dt = this->GetTimeStep();
     const Scal uf = fluid_velocity_;
     const Scal alpha_f = conductivity_fluid_;
@@ -274,11 +280,11 @@ class HeatStorage : public solver::UnsteadySolver {
       auto& flux_fluid = ff_flux_fluid[idxface];
       auto& flux_solid = ff_flux_solid[idxface];
       if (cm.IsNone()) { // left boundary
-        flux_fluid = uf * T_in;
-        flux_solid = 0.;
+        flux_fluid += uf * T_in;
+        flux_solid += 0.;
       } else if (cp.IsNone()) { // right boundary
-        flux_fluid = uf * Tf[cm];
-        flux_solid = 0.;
+        flux_fluid += uf * Tf[cm];
+        flux_solid += 0.;
       } else {
         // convection: first order upwind
         flux_fluid += uf * Tf[cm];
@@ -292,10 +298,10 @@ class HeatStorage : public solver::UnsteadySolver {
     for (IdxCell idxcell : mesh.Cells()) {
       IdxFace fm = mesh.GetNeighbourFace(idxcell, 0);
       IdxFace fp = mesh.GetNeighbourFace(idxcell, 1);
-      Scal fluxsum_fluid = ff_flux_fluid[fp] - ff_flux_fluid[fm];
+      const Scal fluxsum_fluid = ff_flux_fluid[fp] - ff_flux_fluid[fm];
       Tf_new[idxcell] = Tf[idxcell] - dt / h * fluxsum_fluid;
-      Scal fluxsum_solid = ff_flux_solid[fp] - ff_flux_solid[fm];
-      Ts_new[idxcell] = Tf[idxcell] - dt / h * fluxsum_solid;
+      const Scal fluxsum_solid = ff_flux_solid[fp] - ff_flux_solid[fm];
+      Ts_new[idxcell] = Ts[idxcell] - dt / h * fluxsum_solid;
     }
 
     // Time integration of source terms
@@ -394,12 +400,16 @@ hydro<Mesh>::hydro(TExperiment* _ex)
   P_int.set("cells_number", static_cast<int>(mesh.GetNumCells()));
 
   content = {
-      std::make_shared<output::EntryFunction<Scal, IdxNode, Mesh>>(
+      std::make_shared<output::EntryFunction<Scal, IdxCell, Mesh>>(
           "x", mesh,
-          [this](IdxNode idx) { return mesh.GetNode(idx)[0]; })
-//      , std::make_shared<output::EntryFunction<Scal, IdxCell, Mesh>>(
-//          "tf", mesh,
-//          [this](IdxCell idx) { return fc_temperature_fluid_.time_curr[idx]; })
+          [this](IdxCell idx) { return mesh.GetCenter(idx)[0]; })
+      , std::make_shared<output::EntryFunction<Scal, IdxCell, Mesh>>(
+          "Tf", mesh,
+          [this](IdxCell idx) { return solver_->GetFluidTemperature()[idx]; })
+      , std::make_shared<output::EntryFunction<Scal, IdxCell, Mesh>>(
+          "Ts", mesh,
+          [this](IdxCell idx) { return solver_->GetSolidTemperature()[idx]; })
+
   };
 
   auto P = [this](std::string entry, std::string parameter) {
@@ -437,7 +447,7 @@ hydro<Mesh>::hydro(TExperiment* _ex)
   session_scalar->Write();
 
 
-  {
+  if (flag("MMS")) {
     const Scal uf = P_double["MMS_fluid_velocity"];
     const Scal alpha = P_double["MMS_alpha"];
     const Scal wavenumber = P_double["MMS_wavenumber"];
@@ -463,21 +473,18 @@ hydro<Mesh>::hydro(TExperiment* _ex)
       throw std::string("Unknown MMS_exact_solution: " + mmsfunc);
     }
 
-
-    if (flag("MMS")) {
-      typename HeatStorage<Mesh>::TesterMms tester(
-          P_int["MMS_mesh_initial"],
-          P_int["MMS_num_stages"],
-          P_int["MMS_factor"],
-          P_double["MMS_domain_length"],
-          P_int["MMS_num_steps"],
-          P_double["MMS_time_step"],
-          P_double["MMS_step_threshold"],
-          P_double["MMS_fluid_velocity"],
-          P_double["MMS_alpha"],
-          P_double["MMS_T_left"],
-          func_rhs, func_exact);
-    }
+    typename HeatStorage<Mesh>::TesterMms tester(
+        P_int["MMS_mesh_initial"],
+        P_int["MMS_num_stages"],
+        P_int["MMS_factor"],
+        P_double["MMS_domain_length"],
+        P_int["MMS_num_steps"],
+        P_double["MMS_time_step"],
+        P_double["MMS_step_threshold"],
+        P_double["MMS_fluid_velocity"],
+        P_double["MMS_alpha"],
+        P_double["MMS_T_left"],
+        func_rhs, func_exact);
   }
 }
 
@@ -485,6 +492,9 @@ template <class Mesh>
 void hydro<Mesh>::step() {
   ex->timer_.Push("step");
 
+  solver_->StartStep();
+  solver_->CalcStep();
+  solver_->FinishStep();
 
   ++P_int["n"];
   ex->timer_.Pop();
