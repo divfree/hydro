@@ -105,7 +105,8 @@ class HeatStorage : public solver::UnsteadySolver {
         entry.solver = std::make_shared<HeatStorage>(mesh, time_step, fluid_velocity,
                                                      conductivity, conductivity,
                                                      Tleft, Tleft, 0., 0.,
-                                                     &fc_rhs_fluid, &fc_rhs_solid);
+                                                     &fc_rhs_fluid, &fc_rhs_solid,
+                                                     Scheduler());
         auto& solver = *entry.solver;
         size_t actual_num_steps = num_steps;
         for (size_t n = 0; n < num_steps; ++n) {
@@ -160,6 +161,7 @@ class HeatStorage : public solver::UnsteadySolver {
    public:
     enum class State { Charging, Idle, Discharging };
 
+    Scheduler() = default;
     Scheduler(double d1, double d2, double d3, double d4)
         : d1_(d1), d2_(d2), d3_(d3), d4_(d4) {}
 
@@ -191,18 +193,16 @@ class HeatStorage : public solver::UnsteadySolver {
               double fluid_velocity, double conductivity_fluid, double conductivity_solid,
               double temperature_hot, double temperature_cold,
               double exchange_fluid, double exchange_solid,
-              const FieldCell<Scal>* p_fc_rhs_fluid, const FieldCell<Scal>* p_fc_rhs_solid)
+              const FieldCell<Scal>* p_fc_rhs_fluid, const FieldCell<Scal>* p_fc_rhs_solid,
+              const Scheduler& scheduler)
       : UnsteadySolver(0., time_step),
         mesh(mesh), fluid_velocity_(fluid_velocity),
         conductivity_fluid_(conductivity_fluid), conductivity_solid_(conductivity_solid),
         temperature_hot_(temperature_hot), temperature_cold_(temperature_cold),
         exchange_fluid_(exchange_fluid), exchange_solid_(exchange_solid),
-        p_fc_rhs_fluid_(p_fc_rhs_fluid), p_fc_rhs_solid_(p_fc_rhs_solid)
-        {
-
-    //,
-    //      scheduler_(P_double["duration_1"], P_double["duration_2"],
-    //                 P_double["duration_3"], P_double["duration_4"])
+        p_fc_rhs_fluid_(p_fc_rhs_fluid), p_fc_rhs_solid_(p_fc_rhs_solid),
+        scheduler_(scheduler)
+  {
 
     // Init fields
     fc_temperature_fluid_.time_curr.Reinit(mesh, temperature_cold_);
@@ -271,7 +271,7 @@ class HeatStorage : public solver::UnsteadySolver {
     const Scal uf = fluid_velocity_;
     const Scal alpha_f = conductivity_fluid_;
     const Scal alpha_s = conductivity_solid_;
-    const Scal T_in = temperature_hot_;
+    const Scal T_in = uf > 0. ? temperature_hot_ : temperature_cold_;
 
     // Equation: dT/dt + div(fluxes) = 0
     FieldFace<Scal> ff_flux_fluid(mesh, 0.);
@@ -349,6 +349,7 @@ class HeatStorage : public solver::UnsteadySolver {
   Scal exchange_fluid_, exchange_solid_;
   const FieldCell<Scal>* p_fc_rhs_fluid_;
   const FieldCell<Scal>* p_fc_rhs_solid_;
+  Scheduler scheduler_;
 };
 
 template <class Mesh>
@@ -412,13 +413,17 @@ hydro<Mesh>::hydro(TExperiment* _ex)
   MIdx mesh_size(P_int["Nx"]);
   geom::InitUniformMesh(mesh, domain, mesh_size);
 
+  auto scheduler = typename HeatStorage<Mesh>::Scheduler(
+      P_double["duration_1"], P_double["duration_2"],
+      P_double["duration_3"], P_double["duration_4"]);
+
   solver_ = std::make_shared<HeatStorage<Mesh>>(
       mesh, dt,
       P_double["uf"],
       P_double["alpha_fluid"], P_double["alpha_solid"],
       P_double["T_hot"], P_double["T_cold"],
       P_double["exchange"], P_double["exchange"],
-      nullptr, nullptr);
+      nullptr, nullptr, scheduler);
 
   P_int.set("cells_number", static_cast<int>(mesh.GetNumCells()));
 
