@@ -104,7 +104,7 @@ class HeatStorage : public solver::UnsteadySolver {
         fc_rhs_fluid = Evaluate(func_rhs_fluid, 0., mesh);
         entry.solver = std::make_shared<HeatStorage>(mesh, time_step, fluid_velocity,
                                                      conductivity, conductivity,
-                                                     Tleft, Tleft,
+                                                     Tleft, Tleft, 0., 0.,
                                                      &fc_rhs_fluid, &fc_rhs_solid);
         auto& solver = *entry.solver;
         size_t actual_num_steps = num_steps;
@@ -190,11 +190,13 @@ class HeatStorage : public solver::UnsteadySolver {
   HeatStorage(const Mesh& mesh, double time_step,
               double fluid_velocity, double conductivity_fluid, double conductivity_solid,
               double temperature_hot, double temperature_cold,
+              double exchange_fluid, double exchange_solid,
               const FieldCell<Scal>* p_fc_rhs_fluid, const FieldCell<Scal>* p_fc_rhs_solid)
       : UnsteadySolver(0., time_step),
         mesh(mesh), fluid_velocity_(fluid_velocity),
         conductivity_fluid_(conductivity_fluid), conductivity_solid_(conductivity_solid),
         temperature_hot_(temperature_hot), temperature_cold_(temperature_cold),
+        exchange_fluid_(exchange_fluid), exchange_solid_(exchange_solid),
         p_fc_rhs_fluid_(p_fc_rhs_fluid), p_fc_rhs_solid_(p_fc_rhs_solid)
         {
 
@@ -315,6 +317,9 @@ class HeatStorage : public solver::UnsteadySolver {
         Ts_new[idxcell] += dt * (*p_fc_rhs_solid_)[idxcell];
       }
     }
+
+    // Implicit heat exchange
+
   }
   const Mesh& GetMesh() const { return mesh; }
 
@@ -325,6 +330,7 @@ class HeatStorage : public solver::UnsteadySolver {
   Scal fluid_velocity_;
   Scal conductivity_fluid_, conductivity_solid_;
   Scal temperature_hot_, temperature_cold_;
+  Scal exchange_fluid_, exchange_solid_;
   const FieldCell<Scal>* p_fc_rhs_fluid_;
   const FieldCell<Scal>* p_fc_rhs_solid_;
 };
@@ -395,6 +401,7 @@ hydro<Mesh>::hydro(TExperiment* _ex)
       P_double["uf"],
       P_double["alpha_fluid"], P_double["alpha_solid"],
       P_double["T_hot"], P_double["T_cold"],
+      P_double["exchange"], P_double["exchange"],
       nullptr, nullptr);
 
   P_int.set("cells_number", static_cast<int>(mesh.GetNumCells()));
