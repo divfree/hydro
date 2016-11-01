@@ -165,7 +165,7 @@ class HeatStorage : public solver::UnsteadySolver {
     Scheduler(double d1, double d2, double d3, double d4)
         : d1_(d1), d2_(d2), d3_(d3), d4_(d4) {}
 
-    State GetState(double t) {
+    State GetState(double t) const {
       double cycle_duration = d1_ + d2_ + d3_ + d4_;
       size_t cycle = static_cast<size_t>(t / cycle_duration);
       double offset = t - cycle * cycle_duration;
@@ -173,7 +173,7 @@ class HeatStorage : public solver::UnsteadySolver {
           offset < d1_ + d2_ ? State::Idle :
           offset < d1_ + d2_ + d3_ ? State::Discharging : State::Idle;
     }
-    size_t GetStateIdx(double t) {
+    size_t GetStateIdx(double t) const {
       switch (GetState(t)) {
         case State::Charging:
           return 1;
@@ -181,6 +181,18 @@ class HeatStorage : public solver::UnsteadySolver {
           return 2;
         case State::Idle:
           return 3;
+        default:
+          assert(false);
+      }
+    }
+    Scal GetStateFactor(double t) const {
+      switch (GetState(t)) {
+        case State::Charging:
+          return 1.;
+        case State::Discharging:
+          return -1.;
+        case State::Idle:
+          return 0.;
         default:
           assert(false);
       }
@@ -268,7 +280,7 @@ class HeatStorage : public solver::UnsteadySolver {
 
     const Scal h = mesh.GetVolume(IdxCell(0)); // uniform mesh assumed
     const Scal dt = this->GetTimeStep();
-    const Scal uf = fluid_velocity_;
+    const Scal uf = fluid_velocity_ * scheduler_.GetStateFactor(GetTime());
     const Scal alpha_f = conductivity_fluid_;
     const Scal alpha_s = conductivity_solid_;
     const Scal T_in = uf > 0. ? temperature_hot_ : temperature_cold_;
