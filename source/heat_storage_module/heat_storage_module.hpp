@@ -102,7 +102,10 @@ class HeatStorage : public solver::UnsteadySolver {
 
         FieldCell<Scal> fc_rhs_fluid(mesh, 0.), fc_rhs_solid(mesh, 0.);
         fc_rhs_fluid = Evaluate(func_rhs_fluid, 0., mesh);
-        entry.solver = std::make_shared<HeatStorage>(mesh, time_step, fluid_velocity, conductivity, Tleft, &fc_rhs_fluid, &fc_rhs_solid);
+        entry.solver = std::make_shared<HeatStorage>(mesh, time_step, fluid_velocity,
+                                                     conductivity, conductivity,
+                                                     Tleft, Tleft,
+                                                     &fc_rhs_fluid, &fc_rhs_solid);
         auto& solver = *entry.solver;
         size_t actual_num_steps = num_steps;
         for (size_t n = 0; n < num_steps; ++n) {
@@ -185,11 +188,13 @@ class HeatStorage : public solver::UnsteadySolver {
   };
 
   HeatStorage(const Mesh& mesh, double time_step,
-              double fluid_velocity, double conductivity, double Tleft,
+              double fluid_velocity, double conductivity_fluid, double conductivity_solid,
+              double temperature_hot, double temperature_cold,
               const FieldCell<Scal>* p_fc_rhs_fluid, const FieldCell<Scal>* p_fc_rhs_solid)
       : UnsteadySolver(0., time_step),
-        mesh(mesh),
-        fluid_velocity_(fluid_velocity), conductivity_(conductivity), Tleft_(Tleft),
+        mesh(mesh), fluid_velocity_(fluid_velocity),
+        conductivity_fluid_(conductivity_fluid), conductivity_solid_(conductivity_solid),
+        temperature_hot_(temperature_hot), temperature_cold_(temperature_cold),
         p_fc_rhs_fluid_(p_fc_rhs_fluid), p_fc_rhs_solid_(p_fc_rhs_solid)
         {
 
@@ -246,42 +251,63 @@ class HeatStorage : public solver::UnsteadySolver {
     session.Write(0., "field");
   }
   void CalcStep() {
-    auto& tf = fc_temperature_fluid_.time_prev;
-    auto& tf_new = fc_temperature_fluid_.time_curr;
-    std::swap(tf, tf_new);
-    auto& ts = fc_temperature_solid_.time_prev;
-    auto& ts_new = fc_temperature_solid_.time_curr;
-    std::swap(ts, ts_new);
+    auto& Tf = fc_temperature_fluid_.time_prev;
+    auto& Tf_new = fc_temperature_fluid_.time_curr;
+    std::swap(Tf, Tf_new);
+    auto& Ts = fc_temperature_solid_.time_prev;
+    auto& Ts_new = fc_temperature_solid_.time_curr;
+    std::swap(Ts, Ts_new);
 
     const Scal h = mesh.GetVolume(IdxCell(0));
     const Scal dt = this->GetTimeStep();
     const Scal uf = fluid_velocity_;
-    const Scal alpha = conductivity_;
-    const Scal Tleft = Tleft_;
+    const Scal alpha_f = conductivity_fluid_;
+    const Scal alpha_s = conductivity_solid_;
+    const Scal T_in = temperature_hot_;
 
     // Equation: dT/dt + div(fluxes) = 0
     FieldFace<Scal> ff_flux_fluid(mesh, 0.);
+    FieldFace<Scal> ff_flux_solid(mesh, 0.);
     for (IdxFace idxface : mesh.Faces()) {
       IdxCell cm = mesh.GetNeighbourCell(idxface, 0);
       IdxCell cp = mesh.GetNeighbourCell(idxface, 1);
-      auto& flux = ff_flux_fluid[idxface];
+      auto& flux_fluid = ff_flux_fluid[idxface];
+      auto& flux_solid = ff_flux_solid[idxface];
       if (cm.IsNone()) { // left boundary
-        flux = uf * Tleft;
+        flux_fluid = uf * T_in;
+        flux_solid = 0.;
       } else if (cp.IsNone()) { // right boundary
-        flux = uf * tf[cm];
+        flux_fluid = uf * Tf[cm];
+        flux_solid = 0.;
       } else {
         // convection: first order upwind
-        flux += uf * tf[cm];
+        flux_fluid += uf * Tf[cm];
         // diffusion: central second order
-        flux += -alpha * (tf[cp] - tf[cm]) / h;
+        flux_fluid += -alpha_f * (Tf[cp] - Tf[cm]) / h;
+        flux_solid += -alpha_s * (Ts[cp] - Ts[cm]) / h;
       }
     }
 
+    // Time integration of flux terms
     for (IdxCell idxcell : mesh.Cells()) {
       IdxFace fm = mesh.GetNeighbourFace(idxcell, 0);
       IdxFace fp = mesh.GetNeighbourFace(idxcell, 1);
-      Scal fluxsum = ff_flux_fluid[fp] - ff_flux_fluid[fm];
-      tf_new[idxcell] = tf[idxcell] - dt / h * fluxsum + dt * (*p_fc_rhs_fluid_)[idxcell];
+      Scal fluxsum_fluid = ff_flux_fluid[fp] - ff_flux_fluid[fm];
+      Tf_new[idxcell] = Tf[idxcell] - dt / h * fluxsum_fluid;
+      Scal fluxsum_solid = ff_flux_solid[fp] - ff_flux_solid[fm];
+      Ts_new[idxcell] = Tf[idxcell] - dt / h * fluxsum_solid;
+    }
+
+    // Time integration of source terms
+    if (p_fc_rhs_fluid_) {
+      for (IdxCell idxcell : mesh.Cells()) {
+        Tf_new[idxcell] += dt * (*p_fc_rhs_fluid_)[idxcell];
+      }
+    }
+    if (p_fc_rhs_solid_) {
+      for (IdxCell idxcell : mesh.Cells()) {
+        Ts_new[idxcell] += dt * (*p_fc_rhs_solid_)[idxcell];
+      }
     }
   }
   const Mesh& GetMesh() const { return mesh; }
@@ -290,7 +316,9 @@ class HeatStorage : public solver::UnsteadySolver {
   const Mesh& mesh;
   solver::LayersData<FieldCell<Scal>>
   fc_temperature_fluid_, fc_temperature_solid_;
-  Scal fluid_velocity_, conductivity_, Tleft_;
+  Scal fluid_velocity_;
+  Scal conductivity_fluid_, conductivity_solid_;
+  Scal temperature_hot_, temperature_cold_;
   const FieldCell<Scal>* p_fc_rhs_fluid_;
   const FieldCell<Scal>* p_fc_rhs_solid_;
 };
@@ -358,7 +386,10 @@ hydro<Mesh>::hydro(TExperiment* _ex)
 
   solver_ = std::make_shared<HeatStorage<Mesh>>(
       mesh, dt,
-      P_double["uf"], P_double["alpha"], P_double["T_left"], nullptr, nullptr);
+      P_double["uf"],
+      P_double["alpha_fluid"], P_double["alpha_solid"],
+      P_double["T_hot"], P_double["T_cold"],
+      nullptr, nullptr);
 
   P_int.set("cells_number", static_cast<int>(mesh.GetNumCells()));
 
