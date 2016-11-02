@@ -426,15 +426,32 @@ hydro<Mesh>::hydro(TExperiment* _ex)
   geom::InitUniformMesh(mesh, domain, mesh_size);
 
   auto scheduler = typename HeatStorage<Mesh>::Scheduler(
-      P_double["duration_1"], P_double["duration_2"],
-      P_double["duration_3"], P_double["duration_4"]);
+      P_double["duration_charging"], P_double["duration_idle_charging"],
+      P_double["duration_discharging"], P_double["duration_idle_discharging"]);
+
+  Scal conductivity_fluid, conductivity_solid, exchange_fluid, exchange_solid;
+  {
+    Scal eps = P_double["porosity"];
+    Scal rho_f = P_double["density_fluid"];
+    Scal rho_s = P_double["density_solid"];
+    Scal C_f = P_double["specific_heat_fluid"];
+    Scal C_s = P_double["specific_heat_solid"];
+    Scal k_f = P_double["conductivity_fluid"];
+    Scal k_s = P_double["conductivity_solid"];
+    Scal h_v = P_double["heat_exchange"];
+
+    conductivity_fluid = k_f / (eps * rho_f * C_f);
+    conductivity_solid = k_s / ((1. - eps) * rho_s * C_s);
+    exchange_fluid = h_v / (eps * rho_f * C_f);
+    exchange_solid = h_v / ((1. - eps) * rho_s * C_s);
+  }
 
   solver_ = std::make_shared<HeatStorage<Mesh>>(
       mesh, dt,
       P_double["uf"],
-      P_double["alpha_fluid"], P_double["alpha_solid"],
+      conductivity_fluid, conductivity_solid,
       P_double["T_hot"], P_double["T_cold"],
-      P_double["exchange"], P_double["exchange"],
+      exchange_fluid, exchange_solid,
       nullptr, nullptr, scheduler);
 
   P_int.set("cells_number", static_cast<int>(mesh.GetNumCells()));
