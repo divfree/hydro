@@ -350,6 +350,9 @@ class HeatStorage : public solver::UnsteadySolver {
     }
   }
   const Mesh& GetMesh() const { return mesh; }
+  Scal GetState() const { 
+    return scheduler_.GetStateFactor(GetTime());
+  }
 
  private:
   const Mesh& mesh;
@@ -478,8 +481,8 @@ hydro<Mesh>::hydro(TExperiment* _ex)
         entry, [this, parameter](){ return static_cast<Scal>(P_int[parameter]); });
   };
   content_scalar = { P("time", "t"), Pint("n", "n")
-      //, std::make_shared<output::EntryScalarFunction<Scal>>(
-      //    "status", [this](){ return static_cast<Scal>(scheduler_.GetStateIdx(P_double["t"])); })
+      , std::make_shared<output::EntryScalarFunction<Scal>>(
+          "state", [this](){ return static_cast<Scal>(solver_->GetState()); })
   };
 
   if (!P_string.exist(_plt_title)) {
