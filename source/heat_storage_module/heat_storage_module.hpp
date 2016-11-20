@@ -222,6 +222,8 @@ class HeatStorage : public solver::UnsteadySolver {
 
   class ExergyCalculator {
    public:
+    // requires: constant mass flux, constant fluid specific heat
+    // ensures: exergy is calculated up to a factor and an additive constant
     ExergyCalculator(const HeatStorage* parent) : parent(parent) {}
     void Update() {
       Scal curr_time = parent->GetTime();
@@ -229,12 +231,17 @@ class HeatStorage : public solver::UnsteadySolver {
       if (fresh_) {
         fresh_ = false;
         prev_state_ = curr_state;
+        prev_time_ = curr_time;
+        return;
       }
+      Scal T0 = parent->p_double.at("temperature_reference");
       IdxCell cleft(0);
       IdxCell cright(parent->mesh.GetNumCells() - 1);
       if (prev_state_ == curr_state) {
-        integral_left_ += parent->GetFluidTemperature()[cleft];
-        integral_right_ += parent->GetFluidTemperature()[cright];
+        const Scal dt = curr_time - prev_time_;
+        auto f = [=](Scal T) { return (T - T0 * std::log(T)) * dt; };
+        integral_left_ += f(parent->GetFluidTemperature()[cleft]);
+        integral_right_ += f(parent->GetFluidTemperature()[cright]);
       } else {
         if (prev_state_ == State::Charging) {
           exergy_c_in = integral_left_;
@@ -243,12 +250,18 @@ class HeatStorage : public solver::UnsteadySolver {
           exergy_d_in = integral_right_;
           exergy_d_out = integral_left_;
         }
+        if (exergy_c_in != exergy_c_out) {
+          efficiency = (exergy_d_out - exergy_d_in) /
+              (exergy_c_in - exergy_c_out);
+        }
         integral_left_ = 0.;
         integral_right_ = 0.;
       }
       prev_state_ = curr_state;
+      prev_time_ = curr_time;
     }
     Scal exergy_c_in{0.}, exergy_c_out{0.}, exergy_d_in{0.}, exergy_d_out{0.};
+    Scal efficiency{0.};
 
    private:
     using State = typename Scheduler::State;
@@ -528,6 +541,7 @@ hydro<Mesh>::hydro(TExperiment* _ex)
       {"conductivity_solid", P_double["conductivity_solid"]},
       {"temperature_hot", P_double["T_hot"]},
       {"temperature_cold", P_double["T_cold"]},
+      {"temperature_reference", P_double["T0"]},
       {"heat_exchange", P_double["heat_exchange"]},
       {"porosity", P_double["porosity"]},
   };
@@ -565,15 +579,14 @@ hydro<Mesh>::hydro(TExperiment* _ex)
           "state", [this](){ return static_cast<Scal>(solver_->GetState()); })
       , std::make_shared<output::EntryScalarFunction<Scal>>(
           "exergy_c_in", [this](){ return static_cast<Scal>(solver_->GetExergy().exergy_c_in); })
-
       , std::make_shared<output::EntryScalarFunction<Scal>>(
           "exergy_c_out", [this](){ return static_cast<Scal>(solver_->GetExergy().exergy_c_out); })
-
       , std::make_shared<output::EntryScalarFunction<Scal>>(
           "exergy_d_in", [this](){ return static_cast<Scal>(solver_->GetExergy().exergy_d_in); })
-
       , std::make_shared<output::EntryScalarFunction<Scal>>(
           "exergy_d_out", [this](){ return static_cast<Scal>(solver_->GetExergy().exergy_d_out); })
+      , std::make_shared<output::EntryScalarFunction<Scal>>(
+          "exergy_efficiency", [this](){ return static_cast<Scal>(solver_->GetExergy().efficiency); })
   };
 
   if (!P_string.exist(_plt_title)) {
