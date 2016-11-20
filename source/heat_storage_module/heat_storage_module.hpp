@@ -112,8 +112,19 @@ class HeatStorage : public solver::UnsteadySolver {
 
         FieldCell<Scal> fc_rhs_fluid(mesh, 0.), fc_rhs_solid(mesh, 0.);
         fc_rhs_fluid = Evaluate(func_rhs_fluid, 0., mesh);
+
+        std::map<std::string, double> p_double = {
+            {"fluid_velocity", fluid_velocity},
+            {"conductivity_fluid", conductivity},
+            {"conductivity_solid", conductivity},
+            {"temperature_hot", Tleft},
+            {"temperature_cold", Tleft},
+            {"exchange_fluid", 0.},
+            {"exchange_solid", 0.}
+        };
+
         entry.solver = std::make_shared<HeatStorage>(
-            mesh, time_step, std::map<std::string, double>(),
+            mesh, time_step, p_double,
             fluid_velocity, conductivity, conductivity,
             Tleft, Tleft, 0., 0., &fc_rhs_fluid, &fc_rhs_solid,
             Scheduler());
@@ -242,11 +253,16 @@ class HeatStorage : public solver::UnsteadySolver {
               const FieldCell<Scal>* p_fc_rhs_fluid, const FieldCell<Scal>* p_fc_rhs_solid,
               const Scheduler& scheduler)
       : UnsteadySolver(0., time_step),
-        mesh(mesh), p_double(p_double), fluid_velocity_(fluid_velocity),
-        conductivity_fluid_(conductivity_fluid), conductivity_solid_(conductivity_solid),
-        temperature_hot_(temperature_hot), temperature_cold_(temperature_cold),
-        exchange_fluid_(exchange_fluid), exchange_solid_(exchange_solid),
-        p_fc_rhs_fluid_(p_fc_rhs_fluid), p_fc_rhs_solid_(p_fc_rhs_solid),
+        mesh(mesh), p_double(p_double),
+        fluid_velocity_(p_double.at("fluid_velocity")),
+        conductivity_fluid_(p_double.at("conductivity_fluid")),
+        conductivity_solid_(p_double.at("conductivity_solid")),
+        temperature_hot_(p_double.at("temperature_hot")),
+        temperature_cold_(p_double.at("temperature_cold")),
+        exchange_fluid_(p_double.at("exchange_fluid")),
+        exchange_solid_(p_double.at("exchange_solid")),
+        p_fc_rhs_fluid_(p_fc_rhs_fluid),
+        p_fc_rhs_solid_(p_fc_rhs_solid),
         scheduler_(scheduler)
   {
 
@@ -484,8 +500,19 @@ hydro<Mesh>::hydro(TExperiment* _ex)
     exchange_solid = h_v / ((1. - eps) * rho_s * C_s);
   }
 
+  std::map<std::string, double> p_double = {
+      {"fluid_velocity", P_double["uf"]},
+      {"conductivity_fluid", conductivity_fluid},
+      {"conductivity_solid", conductivity_solid},
+      {"temperature_hot", P_double["T_hot"]},
+      {"temperature_cold", P_double["T_cold"]},
+      {"exchange_fluid", exchange_fluid},
+      {"exchange_solid", exchange_solid}
+  };
+
   solver_ = std::make_shared<HeatStorage<Mesh>>(
-      mesh, dt, ConvertToMap(P_double),
+      mesh, dt,
+      p_double,
       P_double["uf"],
       conductivity_fluid, conductivity_solid,
       P_double["T_hot"], P_double["T_cold"],
