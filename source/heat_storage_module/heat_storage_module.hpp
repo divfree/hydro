@@ -219,29 +219,46 @@ class HeatStorage : public solver::UnsteadySolver {
    private:
     double d1_, d2_, d3_, d4_;
   };
-/*
+
   class ExergyCalculator {
    public:
-    ExergyCalculator(HeatStorage* parent) : parent(parent) {}
+    ExergyCalculator(const HeatStorage* parent) : parent(parent) {}
     void Update() {
       Scal curr_time = parent->GetTime();
-      Scheduler::State curr_state = parent->scheduler_.GetState(curr_time);
-      IdxCell left = parent->
-      if (prev_state_ == curr_state) {
-        integral_ += parent->GetFluidTemperature()
+      State curr_state = parent->scheduler_.GetState(curr_time);
+      if (fresh_) {
+        fresh_ = false;
+        prev_state_ = curr_state;
       }
+      IdxCell cleft(0);
+      IdxCell cright(parent->mesh.GetNumCells() - 1);
+      if (prev_state_ == curr_state) {
+        integral_left_ += parent->GetFluidTemperature()[cleft];
+        integral_right_ += parent->GetFluidTemperature()[cright];
+      } else {
+        if (prev_state_ == State::Charging) {
+          exergy_c_in = integral_left_;
+          exergy_c_out = integral_right_;
+        } else if (prev_state_ == State::Discharging) {
+          exergy_d_in = integral_right_;
+          exergy_d_out = integral_left_;
+        }
+        integral_left_ = 0.;
+        integral_right_ = 0.;
+      }
+      prev_state_ = curr_state;
     }
     Scal exergy_c_in{0.}, exergy_c_out{0.}, exergy_d_in{0.}, exergy_d_out{0.};
 
    private:
-    HeatStorage parent;
-    Scal integral_{0.};
-    Scheduler::State prev_state_;
+    using State = typename Scheduler::State;
+    const HeatStorage* parent;
+    bool fresh_{0.};
+    Scal integral_left_{0.}, integral_right_{0.};
+    State prev_state_;
     Scal prev_time_;
-    enum class Fsm {Init, Charging, IdleAfterCharging,
-      Discharging, IdleAfterDischarging};
   };
-*/
+
   HeatStorage(const Mesh& mesh,
               double time_step,
               const std::map<std::string, double>& p_double,
@@ -406,10 +423,16 @@ class HeatStorage : public solver::UnsteadySolver {
       Tf_new[idxcell] = ai * tf + bi * ts;
       Ts_new[idxcell] = ci * tf + di * ts;
     }
+
+    // Update exergy
+    exergy_.Update();
   }
   const Mesh& GetMesh() const { return mesh; }
   Scal GetState() const { 
     return scheduler_.GetStateFactor(GetTime());
+  }
+  const ExergyCalculator& GetExergy() const {
+    return exergy_;
   }
 
  private:
@@ -427,6 +450,7 @@ class HeatStorage : public solver::UnsteadySolver {
   const FieldCell<Scal>* p_fc_rhs_fluid_;
   const FieldCell<Scal>* p_fc_rhs_solid_;
   Scheduler scheduler_;
+  ExergyCalculator exergy_{this};
 };
 
 template <class Mesh>
@@ -539,6 +563,17 @@ hydro<Mesh>::hydro(TExperiment* _ex)
   content_scalar = { P("time", "t"), Pint("n", "n")
       , std::make_shared<output::EntryScalarFunction<Scal>>(
           "state", [this](){ return static_cast<Scal>(solver_->GetState()); })
+      , std::make_shared<output::EntryScalarFunction<Scal>>(
+          "exergy_c_in", [this](){ return static_cast<Scal>(solver_->GetExergy().exergy_c_in); })
+
+      , std::make_shared<output::EntryScalarFunction<Scal>>(
+          "exergy_c_out", [this](){ return static_cast<Scal>(solver_->GetExergy().exergy_c_out); })
+
+      , std::make_shared<output::EntryScalarFunction<Scal>>(
+          "exergy_d_in", [this](){ return static_cast<Scal>(solver_->GetExergy().exergy_d_in); })
+
+      , std::make_shared<output::EntryScalarFunction<Scal>>(
+          "exergy_d_out", [this](){ return static_cast<Scal>(solver_->GetExergy().exergy_d_out); })
   };
 
   if (!P_string.exist(_plt_title)) {
