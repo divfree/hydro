@@ -125,8 +125,7 @@ class HeatStorage : public solver::UnsteadySolver {
 
         entry.solver = std::make_shared<HeatStorage>(
             mesh, time_step, p_double,
-            fluid_velocity, conductivity, conductivity,
-            Tleft, Tleft, 0., 0., &fc_rhs_fluid, &fc_rhs_solid,
+            &fc_rhs_fluid, &fc_rhs_solid,
             Scheduler());
         auto& solver = *entry.solver;
         size_t actual_num_steps = num_steps;
@@ -247,10 +246,8 @@ class HeatStorage : public solver::UnsteadySolver {
   HeatStorage(const Mesh& mesh,
               double time_step,
               const std::map<std::string, double>& p_double,
-              double fluid_velocity, double conductivity_fluid, double conductivity_solid,
-              double temperature_hot, double temperature_cold,
-              double exchange_fluid, double exchange_solid,
-              const FieldCell<Scal>* p_fc_rhs_fluid, const FieldCell<Scal>* p_fc_rhs_solid,
+              const FieldCell<Scal>* p_fc_rhs_fluid,
+              const FieldCell<Scal>* p_fc_rhs_solid,
               const Scheduler& scheduler)
       : UnsteadySolver(0., time_step),
         mesh(mesh), p_double(p_double),
@@ -513,10 +510,6 @@ hydro<Mesh>::hydro(TExperiment* _ex)
   solver_ = std::make_shared<HeatStorage<Mesh>>(
       mesh, dt,
       p_double,
-      P_double["uf"],
-      conductivity_fluid, conductivity_solid,
-      P_double["T_hot"], P_double["T_cold"],
-      exchange_fluid, exchange_solid,
       nullptr, nullptr, scheduler);
 
   P_int.set("cells_number", static_cast<int>(mesh.GetNumCells()));
