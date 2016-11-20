@@ -119,8 +119,7 @@ class HeatStorage : public solver::UnsteadySolver {
             {"conductivity_solid", conductivity},
             {"temperature_hot", Tleft},
             {"temperature_cold", Tleft},
-            {"exchange_fluid", 0.},
-            {"exchange_solid", 0.}
+            {"heat_exchange", 0.}
         };
 
         entry.solver = std::make_shared<HeatStorage>(
@@ -252,12 +251,16 @@ class HeatStorage : public solver::UnsteadySolver {
       : UnsteadySolver(0., time_step),
         mesh(mesh), p_double(p_double),
         fluid_velocity_(p_double.at("fluid_velocity")),
+        density_fluid_(p_double.at("density_fluid")),
+        density_solid_(p_double.at("density_solid")),
         conductivity_fluid_(p_double.at("conductivity_fluid")),
         conductivity_solid_(p_double.at("conductivity_solid")),
+        specific_heat_fluid_(p_double.at("specific_heat_fluid")),
+        specific_heat_solid_(p_double.at("specific_heat_solid")),
         temperature_hot_(p_double.at("temperature_hot")),
         temperature_cold_(p_double.at("temperature_cold")),
-        exchange_fluid_(p_double.at("exchange_fluid")),
-        exchange_solid_(p_double.at("exchange_solid")),
+        heat_exchange_(p_double.at("heat_exchange")),
+        porosity_(p_double.at("porosity")),
         p_fc_rhs_fluid_(p_fc_rhs_fluid),
         p_fc_rhs_solid_(p_fc_rhs_solid),
         scheduler_(scheduler)
@@ -328,8 +331,15 @@ class HeatStorage : public solver::UnsteadySolver {
     const Scal h = mesh.GetVolume(IdxCell(0)); // uniform mesh assumed
     const Scal dt = this->GetTimeStep();
     const Scal uf = fluid_velocity_ * scheduler_.GetStateFactor(GetTime());
-    const Scal alpha_f = conductivity_fluid_;
-    const Scal alpha_s = conductivity_solid_;
+    const Scal rho_f = density_fluid_;
+    const Scal rho_s = density_solid_;
+    const Scal C_f = specific_heat_fluid_;
+    const Scal C_s = specific_heat_solid_;
+    const Scal k_f = conductivity_fluid_;
+    const Scal k_s = conductivity_solid_;
+    const Scal eps = porosity_;
+    const Scal alpha_f = k_f / (eps * rho_f * C_f);
+    const Scal alpha_s = k_s / ((1. - eps) * rho_s * C_s);
     const Scal T_in = uf > 0. ? temperature_hot_ : temperature_cold_;
 
     // Equation: dT/dt + div(fluxes) = 0
@@ -378,8 +388,9 @@ class HeatStorage : public solver::UnsteadySolver {
     }
 
     // Implicit heat exchange
-    const Scal hf = exchange_fluid_;
-    const Scal hs = exchange_solid_;
+    const Scal h_v = heat_exchange_;
+    const Scal hf = h_v / (eps * rho_f * C_f);
+    const Scal hs = h_v / ((1. - eps) * rho_s * C_s);
     const Scal a = 1. + hf * dt;
     const Scal b = -hf * dt;
     const Scal c = -hs * dt;
@@ -407,9 +418,12 @@ class HeatStorage : public solver::UnsteadySolver {
   solver::LayersData<FieldCell<Scal>>
   fc_temperature_fluid_, fc_temperature_solid_;
   Scal fluid_velocity_;
+  Scal density_fluid_, density_solid_;
   Scal conductivity_fluid_, conductivity_solid_;
+  Scal specific_heat_fluid_, specific_heat_solid_;
   Scal temperature_hot_, temperature_cold_;
-  Scal exchange_fluid_, exchange_solid_;
+  Scal heat_exchange_;
+  Scal porosity_;
   const FieldCell<Scal>* p_fc_rhs_fluid_;
   const FieldCell<Scal>* p_fc_rhs_solid_;
   Scheduler scheduler_;
@@ -480,31 +494,18 @@ hydro<Mesh>::hydro(TExperiment* _ex)
       P_double["duration_charging"], P_double["duration_idle_charging"],
       P_double["duration_discharging"], P_double["duration_idle_discharging"]);
 
-  Scal conductivity_fluid, conductivity_solid, exchange_fluid, exchange_solid;
-  {
-    Scal eps = P_double["porosity"];
-    Scal rho_f = P_double["density_fluid"];
-    Scal rho_s = P_double["density_solid"];
-    Scal C_f = P_double["specific_heat_fluid"];
-    Scal C_s = P_double["specific_heat_solid"];
-    Scal k_f = P_double["conductivity_fluid"];
-    Scal k_s = P_double["conductivity_solid"];
-    Scal h_v = P_double["heat_exchange"];
-
-    conductivity_fluid = k_f / (eps * rho_f * C_f);
-    conductivity_solid = k_s / ((1. - eps) * rho_s * C_s);
-    exchange_fluid = h_v / (eps * rho_f * C_f);
-    exchange_solid = h_v / ((1. - eps) * rho_s * C_s);
-  }
-
   std::map<std::string, double> p_double = {
       {"fluid_velocity", P_double["uf"]},
-      {"conductivity_fluid", conductivity_fluid},
-      {"conductivity_solid", conductivity_solid},
+      {"density_fluid", P_double["density_fluid"]},
+      {"density_solid", P_double["density_solid"]},
+      {"specific_heat_fluid", P_double["specific_heat_fluid"]},
+      {"specific_heat_solid", P_double["specific_heat_solid"]},
+      {"conductivity_fluid", P_double["conductivity_fluid"]},
+      {"conductivity_solid", P_double["conductivity_solid"]},
       {"temperature_hot", P_double["T_hot"]},
       {"temperature_cold", P_double["T_cold"]},
-      {"exchange_fluid", exchange_fluid},
-      {"exchange_solid", exchange_solid}
+      {"heat_exchange", P_double["heat_exchange"]},
+      {"porosity", P_double["porosity"]},
   };
 
   solver_ = std::make_shared<HeatStorage<Mesh>>(
