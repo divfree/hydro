@@ -13,6 +13,7 @@
 #include "../hydro2dmpi/solver.hpp"
 #include <memory>
 #include <utility>
+#include <map>
 
 // TODO: Change parameters on events (e.g. certain time moments)
 
@@ -31,6 +32,15 @@ geom::Vect<double, 1> GetVect<geom::Vect<double, 1>>(const column<double>& v) {
 template <>
 geom::Vect<float, 1> GetVect<geom::Vect<float, 1>>(const column<double>& v) {
   return geom::Vect<float, 1>(float(v[0]));
+}
+
+template <class T>
+std::map<std::string, T> ConvertToMap(const BinSearchSet2<std::string, T>& p) {
+  std::map<std::string, T> res;
+  for (size_t i = 0; i < p.get_length(); ++i) {
+    res[p.get_key(i)] = p.get_data(i);
+  }
+  return res;
 }
 
 template <class Mesh>
@@ -102,11 +112,11 @@ class HeatStorage : public solver::UnsteadySolver {
 
         FieldCell<Scal> fc_rhs_fluid(mesh, 0.), fc_rhs_solid(mesh, 0.);
         fc_rhs_fluid = Evaluate(func_rhs_fluid, 0., mesh);
-        entry.solver = std::make_shared<HeatStorage>(mesh, time_step, fluid_velocity,
-                                                     conductivity, conductivity,
-                                                     Tleft, Tleft, 0., 0.,
-                                                     &fc_rhs_fluid, &fc_rhs_solid,
-                                                     Scheduler());
+        entry.solver = std::make_shared<HeatStorage>(
+            mesh, time_step, std::map<std::string, double>(),
+            fluid_velocity, conductivity, conductivity,
+            Tleft, Tleft, 0., 0., &fc_rhs_fluid, &fc_rhs_solid,
+            Scheduler());
         auto& solver = *entry.solver;
         size_t actual_num_steps = num_steps;
         for (size_t n = 0; n < num_steps; ++n) {
@@ -200,15 +210,39 @@ class HeatStorage : public solver::UnsteadySolver {
    private:
     double d1_, d2_, d3_, d4_;
   };
+/*
+  class ExergyCalculator {
+   public:
+    ExergyCalculator(HeatStorage* parent) : parent(parent) {}
+    void Update() {
+      Scal curr_time = parent->GetTime();
+      Scheduler::State curr_state = parent->scheduler_.GetState(curr_time);
+      IdxCell left = parent->
+      if (prev_state_ == curr_state) {
+        integral_ += parent->GetFluidTemperature()
+      }
+    }
+    Scal exergy_c_in{0.}, exergy_c_out{0.}, exergy_d_in{0.}, exergy_d_out{0.};
 
-  HeatStorage(const Mesh& mesh, double time_step,
+   private:
+    HeatStorage parent;
+    Scal integral_{0.};
+    Scheduler::State prev_state_;
+    Scal prev_time_;
+    enum class Fsm {Init, Charging, IdleAfterCharging,
+      Discharging, IdleAfterDischarging};
+  };
+*/
+  HeatStorage(const Mesh& mesh,
+              double time_step,
+              const std::map<std::string, double>& p_double,
               double fluid_velocity, double conductivity_fluid, double conductivity_solid,
               double temperature_hot, double temperature_cold,
               double exchange_fluid, double exchange_solid,
               const FieldCell<Scal>* p_fc_rhs_fluid, const FieldCell<Scal>* p_fc_rhs_solid,
               const Scheduler& scheduler)
       : UnsteadySolver(0., time_step),
-        mesh(mesh), fluid_velocity_(fluid_velocity),
+        mesh(mesh), p_double(p_double), fluid_velocity_(fluid_velocity),
         conductivity_fluid_(conductivity_fluid), conductivity_solid_(conductivity_solid),
         temperature_hot_(temperature_hot), temperature_cold_(temperature_cold),
         exchange_fluid_(exchange_fluid), exchange_solid_(exchange_solid),
@@ -356,6 +390,7 @@ class HeatStorage : public solver::UnsteadySolver {
 
  private:
   const Mesh& mesh;
+  std::map<std::string, double> p_double;
   solver::LayersData<FieldCell<Scal>>
   fc_temperature_fluid_, fc_temperature_solid_;
   Scal fluid_velocity_;
@@ -450,7 +485,7 @@ hydro<Mesh>::hydro(TExperiment* _ex)
   }
 
   solver_ = std::make_shared<HeatStorage<Mesh>>(
-      mesh, dt,
+      mesh, dt, ConvertToMap(P_double),
       P_double["uf"],
       conductivity_fluid, conductivity_solid,
       P_double["T_hot"], P_double["T_cold"],
