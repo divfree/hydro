@@ -723,9 +723,11 @@ void hydro<Mesh>::write_results(bool force) {
   const double time = P_double["t"];
   const double total_time = P_double["T"];
   const size_t max_frame_index = P_int["max_frame_index"];
-  const double frame_duration = total_time / max_frame_index;
+  const double first_frame_time = ecast(P_double("T_first_frame"));
+  const double frame_duration = (total_time - first_frame_time) / max_frame_index;
 
   if (force || (!ecast(P_bool("no_mesh_output")) &&
+      time >= first_frame_time &&
       time >= last_frame_time_ + frame_duration)) {
     last_frame_time_ = time;
     session->Write(time, "step");
