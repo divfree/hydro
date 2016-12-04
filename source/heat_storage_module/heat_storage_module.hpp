@@ -246,6 +246,9 @@ class HeatStorage : public solver::UnsteadySolver {
         if (prev_state_ == State::Charging) {
           exergy_c_in = integral_left_;
           exergy_c_out = integral_right_;
+          temperature_increase =
+              parent->GetFluidTemperature()[cright] -
+              parent->temperature_cold_;
         } else if (prev_state_ == State::Discharging) {
           exergy_d_in = integral_right_;
           exergy_d_out = integral_left_;
@@ -267,6 +270,7 @@ class HeatStorage : public solver::UnsteadySolver {
     Scal max_thermal_energy_achieved{0.}; // without D^2 * pi / 4
     Scal thermal_energy_limit{0.}; // without D^2 * pi / 4 factor
     Scal capacity_factor{0.};
+    Scal temperature_increase{0.}; // temp. incr. at end of charging
 
    private:
     using State = typename Scheduler::State;
@@ -631,6 +635,8 @@ hydro<Mesh>::hydro(TExperiment* _ex)
           "exergy_efficiency", [this](){ return static_cast<Scal>(solver_->GetExergy().efficiency); })
       , std::make_shared<output::EntryScalarFunction<Scal>>(
           "capacity_factor", [this](){ return static_cast<Scal>(solver_->GetExergy().capacity_factor); })
+      , std::make_shared<output::EntryScalarFunction<Scal>>(
+          "temperature_increase", [this](){ return static_cast<Scal>(solver_->GetExergy().temperature_increase); })
   };
 
   if (!P_string.exist(_plt_title)) {
