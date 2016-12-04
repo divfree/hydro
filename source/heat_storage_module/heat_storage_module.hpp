@@ -259,9 +259,14 @@ class HeatStorage : public solver::UnsteadySolver {
       }
       prev_state_ = curr_state;
       prev_time_ = curr_time;
+      CalcThermalEnergy();
     }
     Scal exergy_c_in{0.}, exergy_c_out{0.}, exergy_d_in{0.}, exergy_d_out{0.};
     Scal efficiency{0.};
+    Scal thermal_energy{0.}; // without D^2 * pi / 4 factor
+    Scal max_thermal_energy_achieved{0.}; // without D^2 * pi / 4
+    Scal thermal_energy_limit{0.}; // without D^2 * pi / 4 factor
+    Scal capacity_factor{0.};
 
    private:
     using State = typename Scheduler::State;
@@ -270,6 +275,43 @@ class HeatStorage : public solver::UnsteadySolver {
     Scal integral_left_{0.}, integral_right_{0.};
     State prev_state_;
     Scal prev_time_;
+    void CalcThermalEnergy() {
+      auto& fc_fluid = parent->GetFluidTemperature();
+      auto& fc_solid = parent->GetSolidTemperature();
+      const Mesh& mesh = parent->GetMesh();
+      Scal int_fluid = 0., int_solid = 0.;
+      for (auto idxcell : mesh.Cells()) {
+        int_fluid += mesh.GetVolume(idxcell) *
+            (fc_fluid[idxcell] - parent->temperature_cold_);
+        int_solid += mesh.GetVolume(idxcell) *
+            (fc_solid[idxcell] - parent->temperature_cold_);
+      }
+
+      thermal_energy =
+          parent->porosity_ * parent->density_fluid_ *
+          parent->specific_heat_fluid_ * int_fluid +
+          (1. - parent->porosity_) * parent->density_solid_ *
+          parent->specific_heat_solid_ * int_solid;
+
+      Scal height = 0.;
+      for (auto idxcell : mesh.Cells()) {
+        height += mesh.GetVolume(idxcell);
+      }
+
+      thermal_energy_limit =
+          (parent->porosity_ * parent->density_fluid_ *
+          parent->specific_heat_fluid_ +
+          (1. - parent->porosity_) * parent->density_solid_ *
+          parent->specific_heat_solid_) *
+          (parent->temperature_hot_ - parent->temperature_cold_) *
+          height;
+
+      max_thermal_energy_achieved = std::max(
+          max_thermal_energy_achieved,
+          thermal_energy);
+
+      capacity_factor = max_thermal_energy_achieved / thermal_energy_limit;
+    }
   };
 
   HeatStorage(const Mesh& mesh,
@@ -587,6 +629,8 @@ hydro<Mesh>::hydro(TExperiment* _ex)
           "exergy_d_out", [this](){ return static_cast<Scal>(solver_->GetExergy().exergy_d_out); })
       , std::make_shared<output::EntryScalarFunction<Scal>>(
           "exergy_efficiency", [this](){ return static_cast<Scal>(solver_->GetExergy().efficiency); })
+      , std::make_shared<output::EntryScalarFunction<Scal>>(
+          "capacity_factor", [this](){ return static_cast<Scal>(solver_->GetExergy().capacity_factor); })
   };
 
   if (!P_string.exist(_plt_title)) {
