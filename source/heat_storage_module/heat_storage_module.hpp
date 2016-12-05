@@ -112,20 +112,29 @@ class HeatStorage : public solver::UnsteadySolver {
 
         FieldCell<Scal> fc_rhs_fluid(mesh, 0.), fc_rhs_solid(mesh, 0.);
         fc_rhs_fluid = Evaluate(func_rhs_fluid, 0., mesh);
+        // fc_rhs_solid remains zero
 
         std::map<std::string, double> p_double = {
             {"fluid_velocity", fluid_velocity},
+            {"density_fluid", 2.},
+            {"density_solid", 2.},
+            {"specific_heat_fluid", 1.},
+            {"specific_heat_solid", 1.},
             {"conductivity_fluid", conductivity},
             {"conductivity_solid", conductivity},
-            {"temperature_hot", Tleft},
-            {"temperature_cold", Tleft},
-            {"heat_exchange", 0.}
+            {"temperature_hot",
+                func_exact_fluid_temperature(0., 0.)},
+            {"temperature_cold",
+                func_exact_fluid_temperature(0., domain_length)},
+            {"temperature_reference", 1.},
+            {"heat_exchange", 0.},
+            {"porosity", 0.5},
         };
 
         entry.solver = std::make_shared<HeatStorage>(
             mesh, time_step, p_double,
             &fc_rhs_fluid, &fc_rhs_solid,
-            Scheduler());
+            Scheduler(1e9, 0., 0., 0.));
         auto& solver = *entry.solver;
         size_t actual_num_steps = num_steps;
         for (size_t n = 0; n < num_steps; ++n) {
@@ -180,7 +189,6 @@ class HeatStorage : public solver::UnsteadySolver {
    public:
     enum class State { Charging, Idle, Discharging };
 
-    Scheduler() = default;
     Scheduler(double d1, double d2, double d3, double d4)
         : d1_(d1), d2_(d2), d3_(d3), d4_(d4) {}
 
@@ -682,6 +690,11 @@ hydro<Mesh>::hydro(TExperiment* _ex)
         return -uf * wavenumber * 2. * x * std::sin(sqr(x) * wavenumber) +
             alpha * (sqr(wavenumber) * 4. * sqr(x) * std::cos(sqr(x) * wavenumber) +
                     wavenumber * 2. * std::sin(sqr(x) * wavenumber));
+      };
+    } else if (mmsfunc == "test") {
+      func_exact = [=](Scal, Scal x) { return x; };
+      func_rhs = [=](Scal, Scal x) {
+        return uf;
       };
     } else {
       throw std::string("Unknown MMS_exact_solution: " + mmsfunc);
