@@ -286,22 +286,34 @@ class HeatStorage : public solver::UnsteadySolver {
           exergy_d_in = integral_right_;
           exergy_d_out = integral_left_;
         }
+        // update efficieny value if the denominator is non-zero
         if (exergy_c_in != exergy_c_out) {
           efficiency = (exergy_d_out - exergy_d_in) /
               (exergy_c_in - exergy_c_out);
         }
+        // update thermal energy values
+        CalcThermalEnergy();
+        if (curr_state == State::Charging) {
+          thermal_energy_before_charging = thermal_energy;
+        } else if (curr_state == State::Discharging) {
+          thermal_energy_before_discharging = thermal_energy;
+          capacity_factor =
+              (thermal_energy_before_discharging - thermal_energy_before_charging) /
+              thermal_energy_limit;
+        }
+
         integral_left_ = 0.;
         integral_right_ = 0.;
       }
       prev_state_ = curr_state;
       prev_time_ = curr_time;
-      CalcThermalEnergy();
     }
     Scal exergy_c_in{0.}, exergy_c_out{0.}, exergy_d_in{0.}, exergy_d_out{0.};
     Scal efficiency{0.};
     Scal thermal_energy{0.}; // without D^2 * pi / 4 factor
-    Scal max_thermal_energy_achieved{0.}; // without D^2 * pi / 4
-    Scal thermal_energy_limit{0.}; // without D^2 * pi / 4 factor
+    Scal thermal_energy_before_charging{0.};
+    Scal thermal_energy_before_discharging{0.};
+    Scal thermal_energy_limit{0.};
     Scal capacity_factor{0.};
     Scal temperature_increase{0.}; // temp. incr. at end of charging
 
@@ -342,12 +354,6 @@ class HeatStorage : public solver::UnsteadySolver {
           parent->specific_heat_solid_) *
           (parent->temperature_hot_ - parent->temperature_cold_) *
           height;
-
-      max_thermal_energy_achieved = std::max(
-          max_thermal_energy_achieved,
-          thermal_energy);
-
-      capacity_factor = max_thermal_energy_achieved / thermal_energy_limit;
     }
   };
 
