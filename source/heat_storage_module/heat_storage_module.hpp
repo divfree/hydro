@@ -80,24 +80,30 @@ class HeatStorage : public solver::UnsteadySolver {
   class TesterMms {
    public:
     struct Entry {
-      Scal diff_prev;
-      Scal error;
+      Scal diff_prev_fluid;
+      Scal diff_prev_solid;
+      Scal error_fluid;
+      Scal error_solid;
       Scal h;
       Mesh mesh;
       FieldCell<Scal> fc_fluid_temperature;
+      FieldCell<Scal> fc_solid_temperature;
       FieldCell<Scal> fc_exact_fluid_temperature;
+      FieldCell<Scal> fc_exact_solid_temperature;
       std::shared_ptr<HeatStorage> solver;
     };
     TesterMms(size_t num_cells_initial, size_t num_stages, size_t factor,
               Scal domain_length, size_t num_steps, double time_step,
               Scal step_threshold,
-              Scal fluid_velocity, Scal conductivity, Scal Tleft,
-              FuncTX func_rhs_fluid, FuncTX func_exact_fluid_temperature) {
+              Scal fluid_velocity, Scal conductivity,
+              Scal T_left, Scal T_right,
+              FuncTX func_rhs_fluid, FuncTX func_exact_fluid_temperature,
+              FuncTX func_rhs_solid, FuncTX func_exact_solid_temperature) {
       std::ofstream stat("mms_statistics.dat");
       stat.precision(20);
-      stat << "num_cells error diff dt num_steps step_diff" << std::endl;
+      stat << "num_cells error_fluid error_solid diff_fluid diff_solid dt num_steps step_diff_fluid step_diff_solid" << std::endl;
       
-      std::string field_name_prefix = "field_T_fluid_";
+      std::string field_name_prefix = "field_T_";
 
       for (size_t num_cells = num_cells_initial, i = 0;
           i < num_stages; ++i, num_cells *= factor) {
@@ -112,7 +118,7 @@ class HeatStorage : public solver::UnsteadySolver {
 
         FieldCell<Scal> fc_rhs_fluid(mesh, 0.), fc_rhs_solid(mesh, 0.);
         fc_rhs_fluid = Evaluate(func_rhs_fluid, 0., mesh);
-        // fc_rhs_solid remains zero
+        fc_rhs_solid = Evaluate(func_rhs_solid, 0., mesh);
 
         std::map<std::string, double> p_double = {
             {"fluid_velocity", fluid_velocity},
@@ -122,10 +128,8 @@ class HeatStorage : public solver::UnsteadySolver {
             {"specific_heat_solid", 1.},
             {"conductivity_fluid", conductivity},
             {"conductivity_solid", conductivity},
-            {"temperature_hot",
-                func_exact_fluid_temperature(0., 0.)},
-            {"temperature_cold",
-                func_exact_fluid_temperature(0., domain_length)},
+            {"temperature_hot", T_left},
+            {"temperature_cold", T_right},
             {"temperature_reference", 1.},
             {"heat_exchange", 0.},
             {"porosity", 0.5},
@@ -137,36 +141,53 @@ class HeatStorage : public solver::UnsteadySolver {
             Scheduler(1e9, 0., 0., 0.));
         auto& solver = *entry.solver;
         size_t actual_num_steps = num_steps;
+        Scal step_diff_fluid = 0., step_diff_solid = 0.;
         for (size_t n = 0; n < num_steps; ++n) {
           solver.StartStep();
           solver.CalcStep();
           solver.FinishStep();
-          if (solver::CalcDiff(solver.GetFluidTemperature(Layers::time_curr),
-                               solver.GetFluidTemperature(Layers::time_prev), mesh) < step_threshold) {
+          step_diff_fluid = solver::CalcDiff(solver.GetFluidTemperature(Layers::time_curr),
+                                             solver.GetFluidTemperature(Layers::time_prev),
+                                             mesh);
+          step_diff_solid = solver::CalcDiff(solver.GetSolidTemperature(Layers::time_curr),
+                                             solver.GetSolidTemperature(Layers::time_prev),
+                                             mesh);
+          if (std::max(step_diff_fluid, step_diff_solid) < step_threshold) {
             actual_num_steps = n;
             break;
           }
         }
 
         entry.fc_fluid_temperature = solver.GetFluidTemperature();
-        entry.diff_prev = series_.empty() ? 0. :
+        entry.diff_prev_fluid = series_.empty() ? 0. :
             solver::CalcDiff(entry.fc_fluid_temperature,
                              GetInterpolated(series_.back().fc_fluid_temperature, series_.back().mesh, mesh),
                              mesh);
 
+        entry.fc_solid_temperature = solver.GetSolidTemperature();
+        entry.diff_prev_solid = series_.empty() ? 0. :
+            solver::CalcDiff(entry.fc_solid_temperature,
+                             GetInterpolated(series_.back().fc_solid_temperature, series_.back().mesh, mesh),
+                             mesh);
+
         entry.fc_exact_fluid_temperature = Evaluate(func_exact_fluid_temperature, 0., mesh);
-        entry.error = solver::CalcDiff(entry.fc_exact_fluid_temperature,
+        entry.error_fluid = solver::CalcDiff(entry.fc_exact_fluid_temperature,
                                        entry.fc_fluid_temperature,
                                        mesh);
         
-        const Scal step_diff = 
-            solver::CalcDiff(solver.GetFluidTemperature(Layers::time_curr),
-                             solver.GetFluidTemperature(Layers::time_prev), mesh);
+        entry.fc_exact_solid_temperature = Evaluate(func_exact_solid_temperature, 0., mesh);
+        entry.error_solid = solver::CalcDiff(entry.fc_exact_solid_temperature,
+                                       entry.fc_solid_temperature,
+                                       mesh);
 
-        stat << num_cells << ' ' << entry.error << ' ' << entry.diff_prev 
-            << time_step << ' ' << actual_num_steps << ' ' << step_diff << std::endl;
+        stat << num_cells << ' '
+            << entry.error_fluid << ' ' << entry.error_solid << ' '
+            << entry.diff_prev_fluid << ' ' << entry.diff_prev_solid << ' '
+            << time_step << ' ' << actual_num_steps << ' '
+            << step_diff_fluid << ' ' << step_diff_solid << std::endl;
 
         solver.WriteField(solver.GetFluidTemperature(),
+                          solver.GetSolidTemperature(),
                           field_name_prefix + IntToStr(num_cells) + ".dat");
       }
 
@@ -174,6 +195,7 @@ class HeatStorage : public solver::UnsteadySolver {
       if (!series_.empty()) {
         auto& entry = series_.back();
         entry.solver->WriteField(entry.fc_exact_fluid_temperature,
+                                 entry.fc_exact_solid_temperature,
                                  field_name_prefix + "exact" + ".dat");
       }
     }
@@ -400,6 +422,23 @@ class HeatStorage : public solver::UnsteadySolver {
         , std::make_shared<output::EntryFunction<Scal, IdxCell, Mesh>>(
             "u", mesh,
             [&](IdxCell idx) { return fc_u[idx]; })
+    };
+    output::SessionPlain<Mesh> session(content, filename, mesh);
+    session.Write(0., "field");
+  }
+  void WriteField(const FieldCell<Scal>& fc_t_fluid,
+                  const FieldCell<Scal>& fc_t_solid,
+                  std::string filename) const {
+    output::Content content = {
+        std::make_shared<output::EntryFunction<Scal, IdxCell, Mesh>>(
+            "x", mesh,
+            [this](IdxCell idx) { return mesh.GetCenter(idx)[0]; })
+        , std::make_shared<output::EntryFunction<Scal, IdxCell, Mesh>>(
+            "T_f", mesh,
+            [&](IdxCell idx) { return fc_t_fluid[idx]; })
+        , std::make_shared<output::EntryFunction<Scal, IdxCell, Mesh>>(
+            "T_s", mesh,
+            [&](IdxCell idx) { return fc_t_solid[idx]; })
     };
     output::SessionPlain<Mesh> session(content, filename, mesh);
     session.Write(0., "field");
@@ -675,26 +714,36 @@ hydro<Mesh>::hydro(TExperiment* _ex)
     const Scal wavenumber = P_double["MMS_wavenumber"];
 
     using FuncTX = typename HeatStorage<Mesh>::FuncTX;
-    FuncTX func_exact, func_rhs;
+    FuncTX func_exact, func_rhs_fluid, func_rhs_solid;
 
     const std::string mmsfunc = P_string["MMS_exact_solution"];
     if (mmsfunc == "cos(kx)") {
       func_exact = [=](Scal, Scal x) { return std::cos(x * wavenumber); };
-      func_rhs = [=](Scal, Scal x) {
+      func_rhs_fluid = [=](Scal, Scal x) {
         return -uf * wavenumber * std::sin(x * wavenumber) +
             alpha * sqr(wavenumber) * std::cos(x * wavenumber);
       };
+      func_rhs_solid = [=](Scal, Scal x) {
+        return alpha * sqr(wavenumber) * std::cos(x * wavenumber);
+      };
     } else if (mmsfunc == "cos(kx^2)") {
       func_exact = [=](Scal, Scal x) { return std::cos(sqr(x) * wavenumber); };
-      func_rhs = [=](Scal, Scal x) {
+      func_rhs_fluid = [=](Scal, Scal x) {
         return -uf * wavenumber * 2. * x * std::sin(sqr(x) * wavenumber) +
             alpha * (sqr(wavenumber) * 4. * sqr(x) * std::cos(sqr(x) * wavenumber) +
                     wavenumber * 2. * std::sin(sqr(x) * wavenumber));
       };
+      func_rhs_solid = [=](Scal, Scal x) {
+        return alpha * (sqr(wavenumber) * 4. * sqr(x) * std::cos(sqr(x) * wavenumber) +
+                    wavenumber * 2. * std::sin(sqr(x) * wavenumber));
+      };
     } else if (mmsfunc == "test") {
       func_exact = [=](Scal, Scal x) { return x; };
-      func_rhs = [=](Scal, Scal x) {
+      func_rhs_fluid = [=](Scal, Scal) {
         return uf;
+      };
+      func_rhs_solid= [=](Scal, Scal) {
+        return 0.;
       };
     } else {
       throw std::string("Unknown MMS_exact_solution: " + mmsfunc);
@@ -710,8 +759,11 @@ hydro<Mesh>::hydro(TExperiment* _ex)
         P_double["MMS_step_threshold"],
         P_double["MMS_fluid_velocity"],
         P_double["MMS_alpha"],
-        P_double["MMS_T_left"],
-        func_rhs, func_exact);
+        func_exact(0., 0.), // T_left is left boundary value from the exact solution
+        0., // T_right acts as initial value (zero)
+        func_rhs_fluid, func_exact,
+        func_rhs_solid, func_exact // func_exact for solid expected to have integral T_right * length
+    );
   }
 }
 
