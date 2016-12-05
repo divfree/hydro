@@ -476,6 +476,7 @@ class HeatStorage : public solver::UnsteadySolver {
       if (cm.IsNone()) { // left boundary
         flux_fluid += uf * (uf > 0. ? T_in : Tf[cp]);
         flux_solid += 0.;
+        //flux_solid += -alpha_f * (Ts[cp] - 1.) / (0.5 * h);
       } else if (cp.IsNone()) { // right boundary
         flux_fluid += uf * (uf < 0. ? T_in : Tf[cm]);
         flux_solid += 0.;
@@ -712,6 +713,7 @@ hydro<Mesh>::hydro(TExperiment* _ex)
     const Scal uf = P_double["MMS_fluid_velocity"];
     const Scal alpha = P_double["MMS_alpha"];
     const Scal wavenumber = P_double["MMS_wavenumber"];
+    const Scal domain_length = P_double["MMS_domain_length"];
 
     using FuncTX = typename HeatStorage<Mesh>::FuncTX;
     FuncTX func_exact, func_rhs_fluid, func_rhs_solid;
@@ -727,15 +729,18 @@ hydro<Mesh>::hydro(TExperiment* _ex)
         return alpha * sqr(wavenumber) * std::cos(x * wavenumber);
       };
     } else if (mmsfunc == "cos(kx^2)") {
-      func_exact = [=](Scal, Scal x) { return std::cos(sqr(x) * wavenumber); };
+      Scal modwavenumber = wavenumber / domain_length;
+      func_exact = [=](Scal, Scal x) {
+        return std::cos(sqr(x) * modwavenumber);
+      };
       func_rhs_fluid = [=](Scal, Scal x) {
-        return -uf * wavenumber * 2. * x * std::sin(sqr(x) * wavenumber) +
-            alpha * (sqr(wavenumber) * 4. * sqr(x) * std::cos(sqr(x) * wavenumber) +
-                    wavenumber * 2. * std::sin(sqr(x) * wavenumber));
+        return -uf * modwavenumber * 2. * x * std::sin(sqr(x) * modwavenumber) +
+            alpha * (sqr(modwavenumber) * 4. * sqr(x) * std::cos(sqr(x) * modwavenumber) +
+                    modwavenumber * 2. * std::sin(sqr(x) * modwavenumber));
       };
       func_rhs_solid = [=](Scal, Scal x) {
-        return alpha * (sqr(wavenumber) * 4. * sqr(x) * std::cos(sqr(x) * wavenumber) +
-                    wavenumber * 2. * std::sin(sqr(x) * wavenumber));
+        return alpha * (sqr(modwavenumber) * 4. * sqr(x) * std::cos(sqr(x) * modwavenumber) +
+                    modwavenumber * 2. * std::sin(sqr(x) * modwavenumber));
       };
     } else if (mmsfunc == "test") {
       func_exact = [=](Scal, Scal x) { return x; };
@@ -753,7 +758,7 @@ hydro<Mesh>::hydro(TExperiment* _ex)
         P_int["MMS_mesh_initial"],
         P_int["MMS_num_stages"],
         P_int["MMS_factor"],
-        P_double["MMS_domain_length"],
+        domain_length,
         P_int["MMS_num_steps"],
         P_double["MMS_time_step"],
         P_double["MMS_step_threshold"],
