@@ -138,7 +138,10 @@ class HeatStorage : public solver::UnsteadySolver {
         entry.solver = std::make_shared<HeatStorage>(
             mesh, time_step, p_double,
             &fc_rhs_fluid, &fc_rhs_solid,
-            Scheduler(1e9, 0., 0., 0.));
+            Scheduler(1e9, 0., 0., 0.),
+            true, func_exact_fluid_temperature(0., 0.),
+            func_exact_fluid_temperature(0., domain_length) // solid assumed equal
+        );
         auto& solver = *entry.solver;
         size_t actual_num_steps = num_steps;
         Scal step_diff_fluid = 0., step_diff_solid = 0.;
@@ -353,7 +356,9 @@ class HeatStorage : public solver::UnsteadySolver {
               const std::map<std::string, double>& p_double,
               const FieldCell<Scal>* p_fc_rhs_fluid,
               const FieldCell<Scal>* p_fc_rhs_solid,
-              const Scheduler& scheduler)
+              const Scheduler& scheduler,
+              bool given_temperature,
+              Scal given_temperature_left, Scal given_temperature_right)
       : UnsteadySolver(0., time_step),
         mesh(mesh), p_double(p_double),
         fluid_velocity_(p_double.at("fluid_velocity")),
@@ -369,7 +374,10 @@ class HeatStorage : public solver::UnsteadySolver {
         porosity_(p_double.at("porosity")),
         p_fc_rhs_fluid_(p_fc_rhs_fluid),
         p_fc_rhs_solid_(p_fc_rhs_solid),
-        scheduler_(scheduler)
+        scheduler_(scheduler),
+        given_temperature_(given_temperature),
+        given_temperature_left_(given_temperature_left),
+        given_temperature_right_(given_temperature_right)
   {
 
     // Init fields
@@ -475,11 +483,18 @@ class HeatStorage : public solver::UnsteadySolver {
       auto& flux_solid = ff_flux_solid[idxface];
       if (cm.IsNone()) { // left boundary
         flux_fluid += uf * (uf > 0. ? T_in : Tf[cp]);
-        flux_solid += 0.;
-        //flux_solid += -alpha_f * (Ts[cp] - 1.) / (0.5 * h);
+        if (given_temperature_) {
+          auto val = given_temperature_left_;
+          flux_fluid += -alpha_f * (Tf[cp] - val) / (0.5 * h);
+          flux_solid += -alpha_s * (Ts[cp] - val) / (0.5 * h);
+        }
       } else if (cp.IsNone()) { // right boundary
         flux_fluid += uf * (uf < 0. ? T_in : Tf[cm]);
-        flux_solid += 0.;
+        if (given_temperature_) {
+          auto val = given_temperature_right_;
+          flux_fluid += -alpha_f * (val - Tf[cm]) / (0.5 * h);
+          flux_solid += -alpha_s * (val - Ts[cm]) / (0.5 * h);
+        }
       } else {
         // convection: first order upwind
         flux_fluid += uf * (uf > 0. ? Tf[cm] : Tf[cp]);
@@ -558,6 +573,8 @@ class HeatStorage : public solver::UnsteadySolver {
   const FieldCell<Scal>* p_fc_rhs_solid_;
   Scheduler scheduler_;
   ExergyCalculator exergy_{this};
+  bool given_temperature_;
+  Scal given_temperature_left_, given_temperature_right_;
 };
 
 template <class Mesh>
@@ -643,7 +660,9 @@ hydro<Mesh>::hydro(TExperiment* _ex)
   solver_ = std::make_shared<HeatStorage<Mesh>>(
       mesh, dt,
       p_double,
-      nullptr, nullptr, scheduler);
+      nullptr, nullptr, scheduler,
+      false, 0., 0. // given temperature
+  );
 
   P_int.set("cells_number", static_cast<int>(mesh.GetNumCells()));
 
