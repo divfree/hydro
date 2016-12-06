@@ -280,7 +280,7 @@ class HeatStorage : public solver::UnsteadySolver {
           exergy_c_in = integral_left_;
           exergy_c_out = integral_right_;
           temperature_increase =
-              parent->GetFluidTemperature()[cright] -
+              parent->GetFluidTemperature(Layers::time_prev)[cright] -
               parent->temperature_cold_;
         } else if (prev_state_ == State::Discharging) {
           exergy_d_in = integral_right_;
