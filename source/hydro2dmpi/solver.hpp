@@ -786,6 +786,9 @@ struct LayersData {
   }
 };
 
+// Convention: Use Get/Set for fast procedures and Calc for those requiring computation:
+// GetValue(field, idx) vs GetNorm(field)
+
 template <class Field, class Mesh, class Scal = typename Mesh::Scal>
 Scal CalcDiff(const Field& first, const Field& second, const Mesh& mesh) {
   Scal res = 0.;

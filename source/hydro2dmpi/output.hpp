@@ -139,42 +139,47 @@ class Session {
 
 namespace plain {
 
-template <class Scal>
+// Requires structured mesh
+template <class Mesh>
 class SessionPlain : public Session {
-  std::ostream& out_;
+  using Scal = typename Mesh::Scal;
+  using MIdx = typename Mesh::MIdx;
+  const Mesh& mesh;
   Content content_;
+  std::ostream& out_;
+  std::ofstream output_file_;
   void WriteHeader() {
-    out_ << "Output session, plain format" << std::endl;
-    out_ << "All fields: ";
-    for (auto& entry_generic : content_) {
-      out_ << entry_generic->GetName() << " ";
-    }
-    out_ << "\n";
-    out_ << "Cell fields: ";
+    out_ << "Cell: ";
     for (auto& entry_generic : content_)
     if (auto entry = dynamic_cast<EntryField<geom::FieldCell<Scal>>*>(
         entry_generic.get())) {
       out_ << entry->GetName() << " ";
     }
     out_ << "\n";
-    out_ << "Face fields: ";
+    out_ << "Face: ";
     for (auto& entry_generic : content_)
     if (auto entry = dynamic_cast<EntryField<geom::FieldFace<Scal>>*>(
         entry_generic.get())) {
       out_ << entry->GetName() << " ";
     }
     out_ << "\n";
-    out_ << "Node fields: ";
+    out_ << "Node: ";
     for (auto& entry_generic : content_)
     if (auto entry = dynamic_cast<EntryField<geom::FieldNode<Scal>>*>(
         entry_generic.get())) {
       out_ << entry->GetName() << " ";
     }
     out_ << "\n";
+
+    out_ << "Dim: ";
+    MIdx dim = mesh.GetBlockCells().GetDimensions();
+    for (size_t i = 0; i < dim.size(); ++i) {
+      out_ << dim[i] << " ";
+    }
     out_ << std::endl;
   }
   void WriteFooter() {
-    out_ << "Output session finished" << std::endl;
+    out_.flush();
   }
   template <class FieldType>
   bool TryWriteField(EntryGeneric* entry_generic) {
@@ -190,19 +195,27 @@ class SessionPlain : public Session {
     return false;
   }
  public:
-  SessionPlain(const Content& content, std::ostream& out)
-      : out_(out)
+  SessionPlain(const Content& content, std::string filename, const Mesh& mesh)
+      : mesh(mesh)
       , content_(content)
+      , out_(output_file_)
   {
+    output_file_.open(filename);
     WriteHeader();
   }
   void Write(double time = 0., std::string title = "") override {
-    out_ << "Time = " << time
-        << ", Title = " << title << std::endl;
+    out_ << "Zone: time " << time
+        << ", title " << title << std::endl;
     for (auto& entry_generic : content_) {
       entry_generic->Prepare();
+    }
+    for (auto& entry_generic : content_) {
       TryWriteField<geom::FieldCell<Scal>>(entry_generic.get());
+    }
+    for (auto& entry_generic : content_) {
       TryWriteField<geom::FieldFace<Scal>>(entry_generic.get());
+    }
+    for (auto& entry_generic : content_) {
       TryWriteField<geom::FieldNode<Scal>>(entry_generic.get());
     }
     out_ << std::endl;
@@ -212,7 +225,45 @@ class SessionPlain : public Session {
   }
 };
 
+
+template <class Scal>
+class SessionPlainScalar : public Session {
+ public:
+  SessionPlainScalar(const Content& content, std::string filename)
+      : content_(content)
+      , out_(output_file_)
+  {
+    output_file_.open(filename);
+    for (auto& entry_generic : content_) {
+      out_ << entry_generic->GetName() << " ";
+    }
+    out_ << std::endl;
+  }
+  void Write(double /*time = 0.*/, std::string /*title = ""*/) override {
+    for (auto& entry_generic : content_) {
+      entry_generic->Prepare();
+      if (auto entry = dynamic_cast<EntryScalar<Scal>*>(
+          entry_generic.get())) {
+        out_ << entry->GetValue() << " ";
+      } else {
+        throw std::runtime_error(
+            "SessionPlainScalar: Unknown entry type");
+      }
+    }
+
+    out_ << std::endl;
+  }
+ private:
+  Content content_;
+  std::ostream& out_;
+  std::ofstream output_file_;
+};
+
+
 } // namespace plain
+
+template <class Scal>
+using SessionPlainScalar = plain::SessionPlainScalar<Scal>;
 
 template <class Mesh>
 using SessionPlain = plain::SessionPlain<Mesh>;

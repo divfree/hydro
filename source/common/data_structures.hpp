@@ -185,10 +185,10 @@ public:
       PK.set(list[i],0);
   }
   virtual ~TParameter() {}
-  virtual int get_length() = 0;
+  virtual int get_length() const = 0;
   virtual bool exist(TKey key) = 0;
   virtual bool del(TKey) = 0; // ������� ������ � ������ ������
-  virtual TKey get_key(int i) = 0; // ���������� ���� ������ � ������� i
+  virtual TKey get_key(int i) const = 0; // ���������� ���� ������ � ������� i
   virtual void read_data_by_key(istream& in, TKey key) = 0;
   virtual void write_data_by_index(ostream& out, int i) = 0;
   virtual bool write_data_by_key(ostream& out, TKey key) = 0;
@@ -223,11 +223,11 @@ public:
                            // �������� ������������ � ���������� ��������� �� ��
   bool del(TKey); // ������� ������ � ������ ������
   TData value(TKey); // ���������� �������� ������ � ������ ������
-  TKey get_key(int i) // ���������� ���� ������ � ������� i
+  TKey get_key(int i) const // ���������� ���� ������ � ������� i
   {
     if (i<length && i>=0) return keys[i]; else return TKey();
   }
-  TData get_data(int i) // ���������� �������� ������ � ������� i
+  TData get_data(int i) const // ���������� �������� ������ � ������� i
   {
     if (i<length && i>=0) return data[i]; else return TData();
   }
@@ -241,7 +241,7 @@ public:
     if(ptr) return *ptr;
     else throw string("'"+key+"' undefined");
   }
-  int get_length()
+  int get_length() const
   {
     return length;
   }

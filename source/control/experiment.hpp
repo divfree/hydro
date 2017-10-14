@@ -73,7 +73,6 @@ public:
 
 private:
   static std::map<std::string, std::shared_ptr<ModuleFactory>> module_map_;
-  enum class MODULE {hydro2D_uniform, hydro3D_structured, proppant2D};
   void set_name();
   // Subsystems init/term functions
   void init_log();
