@@ -277,6 +277,10 @@ MeshStructured<Scal>::MeshStructured(const BlockNodes& b_nodes,
         nface(0, 1, Direction::j)}};
 
     fc_is_inner_[idxcell] = (mb < midx && midx + MIdx(1) < me);
+    // adhoc for periodic in x
+    if (midx[0] == mb[0] || midx[0] + 1 == me[0]) {
+      fc_is_inner_[idxcell] = true;
+    }
   }
 
   // Offset for cell neighbour cells
@@ -324,6 +328,15 @@ MeshStructured<Scal>::MeshStructured(const BlockNodes& b_nodes,
       }
       if (midx[dir] == me[dir]) {
         ff_neighbour_cell_[idxface][1] = IdxCell::None();
+      }
+      // adhoc for periodic in x
+      if (midx[0] == mb[0] && dir == Direction::i) {
+        ff_neighbour_cell_[idxface][0] = 
+            b_cells_.GetIdx(MIdx(me[0] - 1, midx[1]));
+      }
+      if (midx[0] == me[0] && dir == Direction::i) {
+        ff_neighbour_cell_[idxface][1] = 
+            b_cells_.GetIdx(MIdx(mb[0], midx[1]));
       }
     }
   }

@@ -897,6 +897,8 @@ class FluidSimple : public FluidSolver<Mesh> {
             ff_diag_coeff_[idxface]);
         expr.InsertTerm(-coeff, cm);
         expr.InsertTerm(coeff, cp);
+        // adhoc for periodic
+        expr.SortTerms(true);
       }
       expr.SetConstant(ff_volume_flux_asterisk_[idxface]);
     }
