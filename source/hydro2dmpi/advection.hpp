@@ -294,6 +294,9 @@ class AdvectionSolverExplicit :
       , ff_flux_(mesh)
   {
     fc_u_.time_curr = fc_u_initial;
+
+
+    //**** ADHOC
   }
   void StartStep() override {
     this->ClearIterationCount();

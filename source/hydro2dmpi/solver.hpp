@@ -157,7 +157,8 @@ class InterpolationInnerFaceCentral :
     auto xf = mesh.GetCenter(idxface);
     auto xm = mesh.GetCenter(cm);
     auto xp = mesh.GetCenter(cp);
-    Scal alpha = (xf - xm).dot(xp - xm) / (xp - xm).sqrnorm();
+    //Scal alpha = (xf - xm).dot(xp - xm) / (xp - xm).sqrnorm();
+    Scal alpha = 0.5;
     expr.InsertTerm(1. - alpha, cm);
     expr.InsertTerm(alpha, cp);
     return expr;
@@ -372,7 +373,8 @@ T GetInterpolatedInner(const geom::FieldCell<T>& fc_u,
   Vect xf = mesh.GetCenter(idxface);
   Vect xm = mesh.GetCenter(cm);
   Vect xp = mesh.GetCenter(cp);
-  Scal alpha = (xf - xm).dot(xp - xm) / (xp - xm).sqrnorm();
+  //Scal alpha = (xf - xm).dot(xp - xm) / (xp - xm).sqrnorm();
+  Scal alpha = 0.5;
   return fc_u[cm] * (1. - alpha) + fc_u[cp] * alpha;
 }
 
@@ -425,7 +427,8 @@ geom::FieldFace<T> Interpolate(
         Vect xf = mesh.GetCenter(idxface);
         Vect xm = mesh.GetCenter(cm);
         Vect xp = mesh.GetCenter(cp);
-        Scal alpha = (xf - xm).dot(xp - xm) / (xp - xm).sqrnorm();
+        //Scal alpha = (xf - xm).dot(xp - xm) / (xp - xm).sqrnorm();
+        Scal alpha = 0.5;
         res[idxface] = fc_u[cm] * (1. - alpha) + fc_u[cp] * alpha;
       }
     }
@@ -433,6 +436,9 @@ geom::FieldFace<T> Interpolate(
 
   for (auto it = mf_cond_u.cbegin(); it != mf_cond_u.cend(); ++it) {
     IdxFace idxface = it->GetIdx();
+    if (mesh.IsInner(idxface)) {
+      continue;
+    }
     ConditionFace* cond = it->GetValue().get();
     if (auto cond_value = dynamic_cast<ConditionFaceValue<T>*>(cond)) {
       res[idxface] = cond_value->GetValue();
@@ -528,6 +534,9 @@ geom::FieldFace<T> InterpolateFirstUpwind(
 
   for (auto it = mf_cond_u.cbegin(); it != mf_cond_u.cend(); ++it) {
     IdxFace idxface = it->GetIdx();
+    if (mesh.IsInner(idxface)) {
+      continue;
+    }
     ConditionFace* cond = it->GetValue().get();
     if (auto cond_value = dynamic_cast<ConditionFaceValue<T>*>(cond)) {
       res[idxface] = cond_value->GetValue();
@@ -576,7 +585,10 @@ InterpolateSuperbee(
      if (mesh.IsInner(idxface)) {
        IdxCell P = mesh.GetNeighbourCell(idxface, 0);
        IdxCell E = mesh.GetNeighbourCell(idxface, 1);
-       Vect r = mesh.GetCenter(E) - mesh.GetCenter(P);
+       //Vect r = mesh.GetCenter(E) - mesh.GetCenter(P);
+       Vect rp = mesh.GetVectToCell(idxface, 0); 
+       Vect re = mesh.GetVectToCell(idxface, 1); 
+       Vect r = re - rp;
        const auto& u = fc_u;
        const auto& g = fc_u_grad;
        if (probe[idxface] > threshold) {
@@ -597,6 +609,9 @@ InterpolateSuperbee(
   // TODO: Move interpolation on boundaries to a function
   for (auto it = mf_cond_u.cbegin(); it != mf_cond_u.cend(); ++it) {
     IdxFace idxface = it->GetIdx();
+    if (mesh.IsInner(idxface)) {
+      continue;
+    }
     ConditionFace* cond = it->GetValue().get();
     if (auto cond_value = dynamic_cast<ConditionFaceValue<Scal>*>(cond)) {
       res[idxface] = cond_value->GetValue();

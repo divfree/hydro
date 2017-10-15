@@ -734,6 +734,7 @@ class Jacobi : public LinearSolver<Scal, Idx, Expr> {
         relaxation_factor_(relaxation_factor) {}
   Field<Scal> Solve(const Field<Expr>& system) override {
     Field<Scal> res(system.GetRange(), 0);
+    auto next = res;
 
     size_t iter = 0;
     Scal diff = 0.;
@@ -755,8 +756,9 @@ class Jacobi : public LinearSolver<Scal, Idx, Expr> {
         Scal value = -(eqn.GetConstant() + sum) / diag_coeff;
         Scal corr = value - res[idx];
         diff = std::max(diff, std::abs(corr));
-        res[idx] += corr * relaxation_factor_;
+        next[idx] = res[idx] + corr * relaxation_factor_;
       }
+      std::swap(res, next);
     } while (diff > tolerance_ && iter++ < num_iters_limit_);
 
     std::cout << "iter = " << iter << ", diff = " << diff << std::endl;

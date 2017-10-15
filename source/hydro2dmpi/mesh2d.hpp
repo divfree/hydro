@@ -10,7 +10,7 @@
 #include "mesh.hpp"
 
 #define PERX
-//#define PERY
+#define PERY
 
 namespace geom {
 
@@ -49,6 +49,7 @@ class MeshStructured : public MeshGeneric<Scal, 2> {
   std::array<IntIdx, kCellNumNeighbourNodes> cell_neighbour_node_offset_;
   FieldFace<Direction> ff_direction_;
   FieldFace<std::array<IdxCell, kFaceNumNeighbourCells>> ff_neighbour_cell_;
+  FieldFace<std::array<Vect, kFaceNumNeighbourCells>> ff_to_cell_;
   FieldFace<std::array<IdxNode, kFaceNumNeighbourNodes>> ff_neighbour_node_;
   FieldCell<bool> fc_is_inner_;
   FieldFace<bool> ff_is_inner_;
@@ -142,6 +143,9 @@ class MeshStructured : public MeshGeneric<Scal, 2> {
   }
   IdxCell GetNeighbourCell(IdxFace idx, size_t n) const override {
     return ff_neighbour_cell_[idx][n];
+  }
+  Vect GetVectToCell(IdxFace idx, size_t n) const {
+    return ff_to_cell_[idx][n];
   }
   IdxNode GetNeighbourNode(IdxFace idx, size_t n) const override {
     return ff_neighbour_node_[idx][n];
@@ -258,6 +262,7 @@ MeshStructured<Scal>::MeshStructured(const BlockNodes& b_nodes,
     , ff_direction_(b_faces_)
     , ff_neighbour_cell_(b_faces_)
     , ff_neighbour_node_(b_faces_)
+    , ff_to_cell_(b_faces_)
     , fc_is_inner_(b_cells_)
     , ff_is_inner_(b_faces_)
     , fc_is_excluded_(b_cells_, false)
@@ -378,10 +383,49 @@ MeshStructured<Scal>::MeshStructured(const BlockNodes& b_nodes,
     fc_volume_[idx] = CalcVolume(idx);
   }
 
+  // Vect to cell
+  for (Direction dir : {Direction::i, Direction::j}) {
+    for (auto midx : BlockCells(mb, me - mb + dir)) {
+      IdxFace idxface = b_faces_.GetIdx(midx, dir);
+      ff_to_cell_[idxface][0] = 
+          GetCenter(GetNeighbourCell(idxface, 0)) - GetCenter(idxface);
+      ff_to_cell_[idxface][1] = 
+          GetCenter(GetNeighbourCell(idxface, 1)) - GetCenter(idxface);
+      #ifdef PERX
+      // adhoc for periodic in x
+      if (midx[0] == mb[0] && dir == Direction::i) {
+        auto pf = b_faces_.GetIdx(MIdx(me[0], midx[1]), dir);
+        auto pc = b_cells_.GetIdx(MIdx(me[0] - 1, midx[1]));
+        ff_to_cell_[idxface][0] = GetCenter(pf) - GetCenter(pc);
+      }
+      if (midx[0] == me[0] && dir == Direction::i) {
+        auto pf = b_faces_.GetIdx(MIdx(mb[0], midx[1]), dir);
+        auto pc = b_cells_.GetIdx(MIdx(mb[0], midx[1]));
+        ff_to_cell_[idxface][1] = GetCenter(pf) - GetCenter(pc);
+      }
+      #endif
+      #ifdef PERY
+      // adhoc for periodic in y
+      if (midx[1] == mb[1] && dir == Direction::j) {
+        auto pf = b_faces_.GetIdx(MIdx(midx[0], me[1]), dir);
+        auto pc = b_cells_.GetIdx(MIdx(midx[0], me[1] - 1));
+        ff_to_cell_[idxface][0] = GetCenter(pf) - GetCenter(pc);
+      }
+      if (midx[1] == me[1] && dir == Direction::j) {
+        auto pf = b_faces_.GetIdx(MIdx(midx[0], mb[1]), dir);
+        auto pc = b_cells_.GetIdx(MIdx(midx[0], mb[1]));
+        ff_to_cell_[idxface][1] = GetCenter(pf) - GetCenter(pc);
+      }
+      #endif
+    }
+  }
+
+  // Mark inner faces
   for (auto idxface : this->Faces()) {
     ff_is_inner_[idxface] = (!GetNeighbourCell(idxface, 0).IsNone() &&
         !GetNeighbourCell(idxface, 1).IsNone());
   }
+
 }
 
 } // namespace geom2d
