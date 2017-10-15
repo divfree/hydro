@@ -598,7 +598,7 @@ class FluidSimple : public FluidSolver<Mesh> {
         IdxFace idxface = mesh.GetNeighbourFace(idxcell, i);
         sum += mesh.GetSurface(idxface) *
             ff_ext_force_[idxface].dot(mesh.GetNormal(idxface)) *
-            mesh.GetVectToCell(idxface, i).norm();
+            mesh.GetCenter(idxcell).dist(mesh.GetCenter(idxface));
       }
       fc_ext_force_restored_[idxcell] = sum / mesh.GetVolume(idxcell);
     }
