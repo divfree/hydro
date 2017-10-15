@@ -13,6 +13,8 @@
 #include "solver.hpp"
 #include "particle_system.hpp"
 
+#include <fstream>
+
 namespace solver {
 
 template <class Mesh>
@@ -294,9 +296,6 @@ class AdvectionSolverExplicit :
       , ff_flux_(mesh)
   {
     fc_u_.time_curr = fc_u_initial;
-
-
-    //**** ADHOC
   }
   void StartStep() override {
     this->ClearIterationCount();
@@ -413,6 +412,7 @@ class AdvectionSolverMultiExplicit :
     for (size_t field = 0; field < num_fields_; ++field) {
       v_fc_u_[field].time_curr = v_fc_u_initial[field];
     }
+
   }
   void StartStep() override {
     this->ClearIterationCount();

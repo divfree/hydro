@@ -396,12 +396,12 @@ MeshStructured<Scal>::MeshStructured(const BlockNodes& b_nodes,
       if (midx[0] == mb[0] && dir == Direction::i) {
         auto pf = b_faces_.GetIdx(MIdx(me[0], midx[1]), dir);
         auto pc = b_cells_.GetIdx(MIdx(me[0] - 1, midx[1]));
-        ff_to_cell_[idxface][0] = GetCenter(pf) - GetCenter(pc);
+        ff_to_cell_[idxface][0] = GetCenter(pc) - GetCenter(pf);
       }
       if (midx[0] == me[0] && dir == Direction::i) {
         auto pf = b_faces_.GetIdx(MIdx(mb[0], midx[1]), dir);
         auto pc = b_cells_.GetIdx(MIdx(mb[0], midx[1]));
-        ff_to_cell_[idxface][1] = GetCenter(pf) - GetCenter(pc);
+        ff_to_cell_[idxface][1] = GetCenter(pc) - GetCenter(pf);
       }
       #endif
       #ifdef PERY
@@ -409,12 +409,12 @@ MeshStructured<Scal>::MeshStructured(const BlockNodes& b_nodes,
       if (midx[1] == mb[1] && dir == Direction::j) {
         auto pf = b_faces_.GetIdx(MIdx(midx[0], me[1]), dir);
         auto pc = b_cells_.GetIdx(MIdx(midx[0], me[1] - 1));
-        ff_to_cell_[idxface][0] = GetCenter(pf) - GetCenter(pc);
+        ff_to_cell_[idxface][0] = GetCenter(pc) - GetCenter(pf);
       }
       if (midx[1] == me[1] && dir == Direction::j) {
         auto pf = b_faces_.GetIdx(MIdx(midx[0], mb[1]), dir);
         auto pc = b_cells_.GetIdx(MIdx(midx[0], mb[1]));
-        ff_to_cell_[idxface][1] = GetCenter(pf) - GetCenter(pc);
+        ff_to_cell_[idxface][1] = GetCenter(pc) - GetCenter(pf);
       }
       #endif
     }
