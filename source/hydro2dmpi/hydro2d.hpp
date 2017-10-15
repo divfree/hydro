@@ -270,7 +270,17 @@ void hydro<Mesh>::InitFluidSolver() {
   if (P_vect.exist("initial_velocity")) {
     initial_velocity = GetVect<Vect>(P_vect["initial_velocity"]);
   }
+
   FieldCell<Vect> fc_velocity_initial(mesh, initial_velocity);
+  if (flag("initial_pois")) {
+    logger() << "use initial pois";
+    Vect& u0 = initial_velocity;
+    for (auto idx : mesh.Cells()) {
+      Vect x = mesh.GetCenter(idx);
+      auto& v = fc_velocity_initial[idx];
+      v[0] = x[1] * (1. - x[1]) * 4. * u0[0];
+    }
+  }
   if (P_bool["deforming_velocity"]) {
     fc_velocity_initial = solver::GetDeformingVelocity(mesh);
   }
