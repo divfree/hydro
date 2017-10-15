@@ -9,7 +9,7 @@
 
 #include "mesh.hpp"
 
-//#define PERX
+#define PERX
 //#define PERY
 
 namespace geom {

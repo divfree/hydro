@@ -1158,9 +1158,10 @@ void hydro<Mesh>::CalcRadiation() {
 template<class Mesh>
 void hydro<Mesh>::CalcForce() {
   Vect gravity = GetVect<Vect>(P_vect["gravity"]);
+  Vect force = GetVect<Vect>(P_vect["force"]);
   fc_force.Reinit(mesh);
   for (auto idxcell : mesh.Cells()) {
-    fc_force[idxcell] = gravity * fc_density[idxcell];
+    fc_force[idxcell] = gravity * fc_density[idxcell] + force;
   }
   fc_force = solver::GetSmoothField(fc_force, mesh,
                                     P_int["force_smooth_times"]);
