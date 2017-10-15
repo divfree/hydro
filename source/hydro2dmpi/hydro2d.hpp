@@ -169,6 +169,12 @@ hydro<Mesh>::GetLinearSolverFactory(std::string linear_name,
             P_double["lu_relaxed_tolerance"],
             P_int["lu_relaxed_num_iters_limit"],
             P_double["lu_relaxed_relaxation_factor"]));
+  } else if (linear_name == "jacobi") {
+    return std::make_shared<const solver::LinearSolverFactory>(
+        std::make_shared<const solver::JacobiFactory>(
+            P_double["lu_relaxed_tolerance"],
+            P_int["lu_relaxed_num_iters_limit"],
+            P_double["lu_relaxed_relaxation_factor"]));
   } /*else if (linear_name == "pardiso") {
     std::string second_prefix = "pardiso_";
 
@@ -467,7 +473,8 @@ void hydro<Mesh>::InitAdvectionSolver() {
         &fluid_solver->GetVolumeFlux(solver::Layers::iter_curr),
         v_p_ff_volume_flux_slip,
         v_p_fc_mass_source,
-        0., dt * P_double["advection_dt_factor"], P_bool["tvd_split"]);
+        0., dt * P_double["advection_dt_factor"], P_bool["tvd_split"],
+        P_double["sharp"], v_true_density);
   } else if (advection_solver_name == "pic") {
     advection_solver = std::make_shared<solver::
         AdvectionSolverMultiParticles<Mesh, FieldFace<Scal>>>(
@@ -730,6 +737,15 @@ void hydro<Mesh>::InitOutput() {
                                "stat_volume_out_" + phase));
   }
 
+  // min/max scalar output
+  for (auto i : phases) {
+    std::string phase = IntToStr(i);
+    content_scalar.push_back(P("pd_min_" + phase,
+                               "stat_pd_min_" + phase));
+    content_scalar.push_back(P("pd_max_" + phase,
+                               "stat_pd_max_" + phase));
+  }
+
   if (!P_string.exist(_plt_title)) {
     P_string.set(_plt_title, P_string[_exp_name]);
   }
@@ -822,6 +838,11 @@ void hydro<Mesh>::CalcPhasesVolumeFraction() {
           v_fc_true_density[i][idxcell];
       sum += v_fc_volume_fraction[i][idxcell];
     }
+    for (auto i : phases) {
+      v_fc_volume_fraction[i][idxcell] /= sum;
+    }
+
+    //assert(std::abs(sum - 1.) < 1e-3);
   }
 }
 
@@ -1204,13 +1225,20 @@ void hydro<Mesh>::CalcStat() {
   for (auto i : phases) {
     Scal density = v_true_density[i];
     Scal volume = 0.;
+    Scal pd_min = 1e10;
+    Scal pd_max = -1e10;
     for (auto idxcell : mesh.Cells()) {
       Scal c = v_fc_volume_fraction[i][idxcell];
       volume += c * mesh.GetVolume(idxcell);
+      auto pd = advection_solver->GetField(i)[idxcell];
+      pd_min = std::min(pd_min, pd);
+      pd_max = std::max(pd_max, pd);
     }
     Scal mass = volume * density;
     P_double.set("stat_volume_" + IntToStr(i), volume);
     P_double.set("stat_mass_" + IntToStr(i), mass);
+    P_double.set("stat_pd_min_" + IntToStr(i), pd_min);
+    P_double.set("stat_pd_max_" + IntToStr(i), pd_max);
 
     Scal volume_flux_in = 0.;
     Scal volume_flux_out = 0.;
