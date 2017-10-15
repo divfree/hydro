@@ -95,6 +95,7 @@ class hydro : public TModule
   FieldCell<Vect> fc_force;
   FieldCell<Scal> fc_c1_smooth, fc_c1_laplacian;
   FieldCell<Scal> fc_radiation;
+  FieldCell<Scal> fc_curv_;
   geom::MapFace<std::shared_ptr<solver::ConditionFace>> mf_cond_radiation_shared;
   std::vector<geom::MapFace<std::shared_ptr<solver::ConditionFace>>>
   v_mf_partial_density_cond_;
@@ -624,6 +625,9 @@ void hydro<Mesh>::InitOutput() {
       , std::make_shared<output::EntryFunction<Scal, IdxCell, Mesh>>(
           "excluded", outmesh, [this](IdxCell idx) {
               return mesh.IsExcluded(out_to_mesh_[idx]) ? 1. : 0.; })
+      , std::make_shared<output::EntryFunction<Scal, IdxCell, Mesh>>(
+          "curvature", outmesh, [this](IdxCell idx) {
+              return fc_curv_[out_to_mesh_[idx]]; })
       , std::make_shared<output::EntryFunction<Scal, IdxCell, Mesh>>(
           "divergence", outmesh, [this](IdxCell idx) {
               auto idxcell = out_to_mesh_[idx];
@@ -1163,6 +1167,39 @@ void hydro<Mesh>::CalcForce() {
   for (auto idxcell : mesh.Cells()) {
     fc_force[idxcell] = gravity * fc_density[idxcell] + force;
   }
+
+  // surface tension
+  if (num_phases >= 2) {
+    auto& a = v_fc_volume_fraction[1];
+
+    auto& cond = v_mf_partial_density_cond_[0];
+    auto af = solver::Interpolate(a, cond, mesh);
+    auto gc = solver::Gradient(af, mesh);
+    // zero-derivative bc for Vect
+    geom::MapFace<std::shared_ptr<solver::ConditionFace>> mfvz;
+    for (auto idxface : mesh.Faces()) {
+      if (!mesh.IsExcluded(idxface) && !mesh.IsInner(idxface)) {
+        mfvz[idxface] =
+            std::make_shared<solver::ConditionFaceDerivativeFixed<Vect>>(Vect(0));
+      }
+    }
+    auto gf = solver::Interpolate(gc, mfvz, mesh);
+    fc_curv_.Reinit(mesh, 0.);
+    auto sigma = P_double["sigma"];
+    for (auto idxcell : mesh.Cells()) {
+      for (size_t i = 0; i < mesh.GetNumNeighbourFaces(idxcell); ++i) {
+        IdxFace idxface = mesh.GetNeighbourFace(idxcell, i);
+        auto n = gf[idxface];
+        n /= (n.norm() + 1e-6); 
+        fc_curv_[idxcell] +=  
+          mesh.GetOutwardSurface(idxcell, i).dot(n);
+      }
+      fc_curv_[idxcell] /= mesh.GetVolume(idxcell);
+      auto n = gc[idxcell] / (gc[idxcell].norm() + 1e-6);
+      fc_force[idxcell] += gc[idxcell] * (fc_curv_[idxcell] * sigma);
+    }
+  }
+
   fc_force = solver::GetSmoothField(fc_force, mesh,
                                     P_int["force_smooth_times"]);
 }
