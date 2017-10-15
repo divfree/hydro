@@ -103,6 +103,8 @@ class Expression {
   void InsertTerm(const TermType& term) {
     terms_.push_back(term);
     sorted_ = false;
+    // adhoc periodic
+    SortTerms(true);
   }
   void InsertTerm(Scal coeff, Idx idx) {
     InsertTerm(TermType(coeff, idx));
@@ -716,6 +718,71 @@ class GaussSeidelFactory : public LinearSolverFactoryGeneric {
   }
 };
 
+template <class Scal, class Idx, class Expr>
+class Jacobi : public LinearSolver<Scal, Idx, Expr> {
+  template <class T>
+  using Field = geom::FieldGeneric<T, Idx>;
+  Scal tolerance_;
+  size_t num_iters_limit_;
+  Scal relaxation_factor_;
+
+ public:
+  Jacobi(Scal tolerance, size_t num_iters_limit,
+                         Scal relaxation_factor)
+      : tolerance_(tolerance),
+        num_iters_limit_(num_iters_limit),
+        relaxation_factor_(relaxation_factor) {}
+  Field<Scal> Solve(const Field<Expr>& system) override {
+    Field<Scal> res(system.GetRange(), 0);
+
+    size_t iter = 0;
+    Scal diff = 0.;
+    do {
+      diff = 0.;
+      for (size_t raw = 0; raw < system.size(); ++raw) {
+        Idx idx(raw);
+        const Expr& eqn = system[idx];
+        Scal sum = 0.;
+        Scal diag_coeff = 0.;
+        for (size_t i = 0; i < eqn.size(); ++i) {
+          const auto& term = eqn[i];
+          if (term.idx != idx) {
+            sum += term.coeff * res[term.idx];
+          } else {
+            diag_coeff = term.coeff;
+          }
+        }
+        Scal value = -(eqn.GetConstant() + sum) / diag_coeff;
+        Scal corr = value - res[idx];
+        diff = std::max(diff, std::abs(corr));
+        res[idx] += corr * relaxation_factor_;
+      }
+    } while (diff > tolerance_ && iter++ < num_iters_limit_);
+
+    std::cout << "iter = " << iter << ", diff = " << diff << std::endl;
+
+    return res;
+  }
+};
+
+class JacobiFactory : public LinearSolverFactoryGeneric {
+ private:
+  double tolerance_;
+  size_t num_iters_limit_;
+  double relaxation_factor_;
+ public:
+  JacobiFactory(double tolerance, size_t num_iters_limit,
+                     double relaxation_factor)
+      : tolerance_(tolerance),
+        num_iters_limit_(num_iters_limit),
+        relaxation_factor_(relaxation_factor) {}
+  template <class Scal, class Idx, class Expr>
+  std::shared_ptr<LinearSolver<Scal, Idx, Expr>> Create() const {
+    return std::make_shared<Jacobi<Scal, Idx, Expr>>(
+        tolerance_, num_iters_limit_, relaxation_factor_);
+  }
+};
+
 class LinearSolverFactory {
   std::shared_ptr<const LinearSolverFactoryGeneric> p_generic_factory_;
   template <class Factory, class Scal, class Idx, class Expr>
@@ -745,6 +812,8 @@ class LinearSolverFactory {
         TryCreate<LuDecompositionRelaxedFactory, Scal, Idx, Expr>(res);
     found = found ||
         TryCreate<GaussSeidelFactory, Scal, Idx, Expr>(res);
+    found = found ||
+        TryCreate<JacobiFactory, Scal, Idx, Expr>(res);
 
     if (!found) {
       throw std::runtime_error(
