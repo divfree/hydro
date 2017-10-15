@@ -9,8 +9,8 @@
 
 #include "mesh.hpp"
 
-#define PERX
-#define PERY
+//#define PERX
+//#define PERY
 
 namespace geom {
 
@@ -49,8 +49,8 @@ class MeshStructured : public MeshGeneric<Scal, 2> {
   std::array<IntIdx, kCellNumNeighbourNodes> cell_neighbour_node_offset_;
   FieldFace<Direction> ff_direction_;
   FieldFace<std::array<IdxCell, kFaceNumNeighbourCells>> ff_neighbour_cell_;
-  FieldFace<std::array<Vect, kFaceNumNeighbourCells>> ff_to_cell_;
   FieldFace<std::array<IdxNode, kFaceNumNeighbourNodes>> ff_neighbour_node_;
+  FieldFace<std::array<Vect, kFaceNumNeighbourCells>> ff_to_cell_;
   FieldCell<bool> fc_is_inner_;
   FieldFace<bool> ff_is_inner_;
   FieldCell<bool> fc_is_excluded_;

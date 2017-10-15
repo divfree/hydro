@@ -154,9 +154,9 @@ class InterpolationInnerFaceCentral :
     const Mesh& mesh = this->mesh;
     IdxCell cm = mesh.GetNeighbourCell(idxface, 0);
     IdxCell cp = mesh.GetNeighbourCell(idxface, 1);
-    auto xf = mesh.GetCenter(idxface);
-    auto xm = mesh.GetCenter(cm);
-    auto xp = mesh.GetCenter(cp);
+    //auto xf = mesh.GetCenter(idxface);
+    //auto xm = mesh.GetCenter(cm);
+    //auto xp = mesh.GetCenter(cp);
     //Scal alpha = (xf - xm).dot(xp - xm) / (xp - xm).sqrnorm();
     Scal alpha = 0.5;
     expr.InsertTerm(1. - alpha, cm);
@@ -228,13 +228,11 @@ class InterpolationInnerFaceSecondUpwindDeferred :
     if (probe_[idxface] > threshold_) {
       expr.InsertTerm(1., cm);
       expr.InsertTerm(0., cp);
-      expr.SetConstant(fc_prev_grad_[cm].dot(
-          mesh.GetCenter(idxface) - mesh.GetCenter(cm)));
+      expr.SetConstant(-fc_prev_grad_[cm].dot(mesh.GetVectToCell(idxface, 0)));
     } else if (probe_[idxface] < -threshold_) {
       expr.InsertTerm(0., cm);
       expr.InsertTerm(1., cp);
-      expr.SetConstant(fc_prev_grad_[cp].dot(
-          mesh.GetCenter(idxface) - mesh.GetCenter(cp)));
+      expr.SetConstant(-fc_prev_grad_[cp].dot(mesh.GetVectToCell(idxface, 1)));
     } else {
       // TODO: Make a CDS proper for non-uniform grids
       expr.InsertTerm(0.5, cm);
@@ -269,9 +267,7 @@ class InterpolationBoundaryFaceNearestCell:
         size_t id = mesh.GetValidNeighbourCellId(idxface);
         IdxCell cc = mesh.GetNeighbourCell(idxface, id);
         Scal factor = (id == 0 ? 1. : -1.);
-        Vect xc = mesh.GetCenter(cc);
-        Vect xf = mesh.GetCenter(idxface);
-        Scal alpha = xc.dist(xf) * factor;
+        Scal alpha = mesh.GetVectToCell(idxface, id).norm() * factor;
         expr.SetConstant(alpha * cond_derivative->GetDerivative());
         expr.InsertTerm(1., cc);
       } else {
@@ -297,9 +293,9 @@ class DerivativeInnerFacePlain:
     const Mesh& mesh = this->mesh;
     IdxCell cm = mesh.GetNeighbourCell(idxface, 0);
     IdxCell cp = mesh.GetNeighbourCell(idxface, 1);
-    auto xm = mesh.GetCenter(cm);
-    auto xp = mesh.GetCenter(cp);
-    Scal alpha = Scal(1) / xp.dist(xm);
+    auto dm = mesh.GetVectToCell(idxface, 0);
+    auto dp = mesh.GetVectToCell(idxface, 1);
+    Scal alpha = Scal(1) / (dp - dm).norm();
     expr.InsertTerm(-alpha, cm);
     expr.InsertTerm(alpha, cp);
     return expr;
@@ -331,9 +327,7 @@ class DerivativeBoundaryFacePlain:
         size_t id = mesh.GetValidNeighbourCellId(idxface);
         IdxCell cc = mesh.GetNeighbourCell(idxface, id);
         Scal factor = (id == 0 ? 1. : -1.);
-        Vect xc = mesh.GetCenter(cc);
-        Vect xf = mesh.GetCenter(idxface);
-        Scal alpha = 1. / xc.dist(xf) * factor;
+        Scal alpha = 1. / mesh.GetVectToCell(idxface, id).norm() * factor;
         expr.SetConstant(alpha * cond_value->GetValue());
         expr.InsertTerm(-alpha, cc);
       } else {
@@ -370,9 +364,9 @@ T GetInterpolatedInner(const geom::FieldCell<T>& fc_u,
   using Vect = typename Mesh::Vect;
   IdxCell cm = mesh.GetNeighbourCell(idxface, 0);
   IdxCell cp = mesh.GetNeighbourCell(idxface, 1);
-  Vect xf = mesh.GetCenter(idxface);
-  Vect xm = mesh.GetCenter(cm);
-  Vect xp = mesh.GetCenter(cp);
+  //Vect xf = mesh.GetCenter(idxface);
+  //Vect xm = mesh.GetCenter(cm);
+  //Vect xp = mesh.GetCenter(cp);
   //Scal alpha = (xf - xm).dot(xp - xm) / (xp - xm).sqrnorm();
   Scal alpha = 0.5;
   return fc_u[cm] * (1. - alpha) + fc_u[cp] * alpha;
@@ -424,9 +418,9 @@ geom::FieldFace<T> Interpolate(
       if (mesh.IsInner(idxface)) {
         IdxCell cm = mesh.GetNeighbourCell(idxface, 0);
         IdxCell cp = mesh.GetNeighbourCell(idxface, 1);
-        Vect xf = mesh.GetCenter(idxface);
-        Vect xm = mesh.GetCenter(cm);
-        Vect xp = mesh.GetCenter(cp);
+        //Vect xf = mesh.GetCenter(idxface);
+        //Vect xm = mesh.GetCenter(cm);
+        //Vect xp = mesh.GetCenter(cp);
         //Scal alpha = (xf - xm).dot(xp - xm) / (xp - xm).sqrnorm();
         Scal alpha = 0.5;
         res[idxface] = fc_u[cm] * (1. - alpha) + fc_u[cp] * alpha;
@@ -447,16 +441,14 @@ geom::FieldFace<T> Interpolate(
       size_t id = mesh.GetValidNeighbourCellId(idxface);
       IdxCell cc = mesh.GetNeighbourCell(idxface, id);
       Scal factor = (id == 0 ? 1. : -1.);
-      Vect xc = mesh.GetCenter(cc);
-      Vect xf = mesh.GetCenter(idxface);
-      Scal alpha = xc.dist(xf) * factor;
+      Scal alpha = mesh.GetVectToCell(idxface, id).norm() * factor;
       res[idxface] = fc_u[cc] + cond_derivative->GetDerivative() * alpha;
     } else if (dynamic_cast<ConditionFaceExtrapolation*>(cond)) {
       size_t id = mesh.GetValidNeighbourCellId(idxface);
       IdxCell idxcell = mesh.GetNeighbourCell(idxface, id);
       Scal factor = (id == 0 ? 1. : -1.);
       Vect normal = mesh.GetNormal(idxface) * factor;
-      Scal dist = mesh.GetCenter(idxcell).dist(mesh.GetCenter(idxface));
+      Scal dist = mesh.GetVectToCell(idxface, id).norm();
       T nom = fc_u[idxcell] / dist;
       Scal den = 1. / dist;
       Scal volume = mesh.GetVolume(idxcell);
@@ -492,8 +484,9 @@ CalcLaplacian(const geom::FieldCell<typename Mesh::Scal>& fc_u,
       if (mesh.IsInner(idxface)) {
         auto cm = mesh.GetNeighbourCell(idxface, 0);
         auto cp = mesh.GetNeighbourCell(idxface, 1);
-        Scal derivative = (fc_u[cp] - fc_u[cm]) /
-            mesh.GetCenter(cm).dist(mesh.GetCenter(cp));
+        auto dm = mesh.GetVectToCell(idxface, 0);
+        auto dp = mesh.GetVectToCell(idxface, 1);
+        Scal derivative = (fc_u[cp] - fc_u[cm]) / (dp - dm).norm();
         sum += derivative * mesh.GetArea(idxface) *
             mesh.GetOutwardFactor(idxcell, i);
       }
@@ -545,9 +538,7 @@ geom::FieldFace<T> InterpolateFirstUpwind(
       size_t id = mesh.GetValidNeighbourCellId(idxface);
       IdxCell cc = mesh.GetNeighbourCell(idxface, id);
       Scal factor = (id == 0 ? 1. : -1.);
-      Vect xc = mesh.GetCenter(cc);
-      Vect xf = mesh.GetCenter(idxface);
-      Scal alpha = xc.dist(xf) * factor;
+      Scal alpha = mesh.GetVectToCell(idxface, id).norm() * factor;
       res[idxface] = fc_u[cc] + cond_derivative->GetDerivative() * alpha;
     } else {
       throw std::runtime_error("Unknown boundary condition type");
@@ -585,20 +576,18 @@ InterpolateSuperbee(
      if (mesh.IsInner(idxface)) {
        IdxCell P = mesh.GetNeighbourCell(idxface, 0);
        IdxCell E = mesh.GetNeighbourCell(idxface, 1);
-       //Vect r = mesh.GetCenter(E) - mesh.GetCenter(P);
        Vect rp = mesh.GetVectToCell(idxface, 0); 
        Vect re = mesh.GetVectToCell(idxface, 1); 
-       Vect r = re - rp;
        const auto& u = fc_u;
        const auto& g = fc_u_grad;
        if (probe[idxface] > threshold) {
          res[idxface] =
              u[P] + 0.5 * Superbee(u[E] - u[P],
-                                   2 * g[P].dot(r) - (u[E] - u[P]));
+                                   -g[P].dot(rp) - (u[E] - u[P]));
        } else if (probe[idxface] < -threshold) {
          res[idxface] =
              u[E] - 0.5 * Superbee(u[E] - u[P],
-                                   2 * g[E].dot(r) - (u[E] - u[P]));
+                                   g[E].dot(re) - (u[E] - u[P]));
        } else {
          // TODO: Make a CDS proper for non-uniform grids
          res[idxface] = 0.5 * (u[P] + u[E]);
@@ -620,9 +609,7 @@ InterpolateSuperbee(
       size_t id = mesh.GetValidNeighbourCellId(idxface);
       IdxCell cc = mesh.GetNeighbourCell(idxface, id);
       Scal factor = (id == 0 ? 1. : -1.);
-      Vect xc = mesh.GetCenter(cc);
-      Vect xf = mesh.GetCenter(idxface);
-      Scal alpha = xc.dist(xf) * factor;
+      Scal alpha = mesh.GetVectToCell(idxface, id).norm() * factor;
       res[idxface] = fc_u[cc] + cond_derivative->GetDerivative() * alpha;
     } else {
       throw std::runtime_error("Unknown boundary condition type");
