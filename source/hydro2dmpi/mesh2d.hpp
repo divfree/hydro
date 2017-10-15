@@ -9,6 +9,9 @@
 
 #include "mesh.hpp"
 
+#define PERX
+//#define PERY
+
 namespace geom {
 
 namespace geom2d {
@@ -277,10 +280,18 @@ MeshStructured<Scal>::MeshStructured(const BlockNodes& b_nodes,
         nface(0, 1, Direction::j)}};
 
     fc_is_inner_[idxcell] = (mb < midx && midx + MIdx(1) < me);
+    #ifdef PERX
     // adhoc for periodic in x
     if (midx[0] == mb[0] || midx[0] + 1 == me[0]) {
       fc_is_inner_[idxcell] = true;
     }
+    #endif
+    // adhoc for periodic in y
+    #ifdef PERY
+    if (midx[1] == mb[1] || midx[1] + 1 == me[1]) {
+      fc_is_inner_[idxcell] = true;
+    }
+    #endif
   }
 
   // Offset for cell neighbour cells
@@ -329,6 +340,7 @@ MeshStructured<Scal>::MeshStructured(const BlockNodes& b_nodes,
       if (midx[dir] == me[dir]) {
         ff_neighbour_cell_[idxface][1] = IdxCell::None();
       }
+      #ifdef PERX
       // adhoc for periodic in x
       if (midx[0] == mb[0] && dir == Direction::i) {
         ff_neighbour_cell_[idxface][0] = 
@@ -338,6 +350,18 @@ MeshStructured<Scal>::MeshStructured(const BlockNodes& b_nodes,
         ff_neighbour_cell_[idxface][1] = 
             b_cells_.GetIdx(MIdx(mb[0], midx[1]));
       }
+      #endif
+      // adhoc for periodic in y
+      #ifdef PERY
+      if (midx[1] == mb[1] && dir == Direction::j) {
+        ff_neighbour_cell_[idxface][0] = 
+            b_cells_.GetIdx(MIdx(midx[0], me[1] - 1));
+      }
+      if (midx[1] == me[1] && dir == Direction::j) {
+        ff_neighbour_cell_[idxface][1] = 
+            b_cells_.GetIdx(MIdx(midx[0], mb[1]));
+      }
+      #endif
     }
   }
 
