@@ -16,12 +16,14 @@ class Logger {
  public:
   class LogStream {
     Logger* parent_;
-    const std::string prefix_;
+    std::string prefix_;
     std::stringstream buf_;
-    const bool no_eol_;
+    bool no_eol_;
    public:
     LogStream() = delete;
-    LogStream(LogStream&&) = default;
+    LogStream(const LogStream& o) 
+        : parent_(o.parent_), prefix_(o.prefix_), 
+        buf_(o.buf_.str()), no_eol_(o.no_eol_) {}
     LogStream(Logger* parent, bool no_eol)
         : parent_(parent), no_eol_(no_eol) {}
     LogStream(Logger* parent, std::string prefix, bool no_eol)
