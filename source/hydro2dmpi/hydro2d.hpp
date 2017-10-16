@@ -1184,7 +1184,8 @@ void hydro<Mesh>::CalcForce() {
 
   // surface tension
   if (num_phases >= 2) {
-    auto& a = v_fc_volume_fraction[1];
+    auto a = v_fc_volume_fraction[1];
+    a = solver::GetSmoothField(a, mesh, 1);
 
     auto& cond = v_mf_partial_density_cond_[0];
     auto af = solver::Interpolate(a, cond, mesh);
@@ -1201,16 +1202,16 @@ void hydro<Mesh>::CalcForce() {
     fc_curv_.Reinit(mesh, 0.);
     auto sigma = P_double["sigma"];
     for (auto idxcell : mesh.Cells()) {
+      Vect f(0);
       for (size_t i = 0; i < mesh.GetNumNeighbourFaces(idxcell); ++i) {
         IdxFace idxface = mesh.GetNeighbourFace(idxcell, i);
+        auto g = gf[idxface];
         auto n = gf[idxface];
         n /= (n.norm() + 1e-6); 
-        fc_curv_[idxcell] +=  
-          mesh.GetOutwardSurface(idxcell, i).dot(n);
+        f += g * mesh.GetOutwardSurface(idxcell, i).dot(n);
       }
-      fc_curv_[idxcell] /= mesh.GetVolume(idxcell);
-      auto n = gc[idxcell] / (gc[idxcell].norm() + 1e-6);
-      fc_force[idxcell] += gc[idxcell] * (fc_curv_[idxcell] * sigma);
+      f /= mesh.GetVolume(idxcell);
+      fc_force[idxcell] += f * sigma;
     }
   }
 
