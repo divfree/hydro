@@ -30,7 +30,7 @@ class ConvectionDiffusion : public UnsteadyIterativeSolver {
 
  protected:
   geom::FieldCell<Scal>* p_fc_density_;
-  geom::FieldFace<Scal>* p_ff_kinematic_viscosity_;
+  geom::FieldFace<Scal>* p_ff_kinematic_viscosity_; // adhoc: dynamic viscosity
   geom::FieldCell<Vect>* p_fc_force_;
   geom::FieldFace<Scal>* p_ff_vol_flux_;
 
@@ -612,8 +612,7 @@ class FluidSimple : public FluidSolver<Mesh> {
     fc_kinematic_viscosity_.Reinit(mesh);
     for (auto idxcell : mesh.Cells()) {
       fc_kinematic_viscosity_[idxcell] =
-          (*this->p_fc_viscosity_)[idxcell] /
-          (*this->p_fc_density_)[idxcell];
+          (*this->p_fc_viscosity_)[idxcell];
     }
     ff_kinematic_viscosity_ = Interpolate(
         fc_kinematic_viscosity_, mf_viscosity_cond_, mesh,

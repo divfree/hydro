@@ -24,8 +24,8 @@ class ConvectionDiffusionScalar : public UnsteadyIterativeSolver {
   using Expr = Expression<Scal, IdxCell, 1 + dim * 2>;
 
  protected:
-  const geom::FieldCell<Scal>* p_fc_scaling_;
-  const geom::FieldFace<Scal>* p_ff_diffusion_rate_;
+  const geom::FieldCell<Scal>* p_fc_scaling_;  // density
+  const geom::FieldFace<Scal>* p_ff_diffusion_rate_;  // dynamic viscosity
   const geom::FieldCell<Scal>* p_fc_source_;
   const geom::FieldFace<Scal>* p_ff_vol_flux_;
 
@@ -74,7 +74,8 @@ class ConvectionDiffusionScalarImplicit :
   Scal guess_extrapolation_;
 
   // Common buffers:
-  geom::FieldFace<Expr> ff_flux_;
+  geom::FieldFace<Expr> ff_cflux_;
+  geom::FieldFace<Expr> ff_dflux_;
   geom::FieldCell<Expr> fc_system_;
   geom::FieldCell<Scal> fc_corr_;
   geom::FieldCell<Vect> fc_grad_;
@@ -145,8 +146,8 @@ class ConvectionDiffusionScalarImplicit :
     DerivativeBoundaryFacePlain<Mesh, Expr>
     derivative_boundary(mesh, mf_cond_);
 
-    // Compute fluxes
-    ff_flux_.Reinit(mesh, Expr());
+    // Compute convective fluxes
+    ff_cflux_.Reinit(mesh, Expr());
 #pragma omp parallel for
     for (IntIdx i = 0; i < static_cast<IntIdx>(mesh.Faces().size()); ++i) {
       IdxFace idxface(i);
@@ -154,14 +155,27 @@ class ConvectionDiffusionScalarImplicit :
         Expr value_expr, derivative_expr;
         if (mesh.IsInner(idxface)) {
           value_expr = value_inner.GetExpression(idxface);
-          derivative_expr = derivative_inner.GetExpression(idxface);
         } else {
           value_expr = value_boundary.GetExpression(idxface);
+        }
+        ff_cflux_[idxface] =
+            value_expr * (*this->p_ff_vol_flux_)[idxface];
+      }
+    }
+
+    // Compute diffusive fluxes
+    ff_dflux_.Reinit(mesh, Expr());
+#pragma omp parallel for
+    for (IntIdx i = 0; i < static_cast<IntIdx>(mesh.Faces().size()); ++i) {
+      IdxFace idxface(i);
+      if (!mesh.IsExcluded(idxface)) {
+        Expr value_expr, derivative_expr;
+        if (mesh.IsInner(idxface)) {
+          derivative_expr = derivative_inner.GetExpression(idxface);
+        } else {
           derivative_expr = derivative_boundary.GetExpression(idxface);
         }
-        ff_flux_[idxface] =
-            value_expr * (*this->p_ff_vol_flux_)[idxface] +
-            derivative_expr *
+        ff_dflux_[idxface] = derivative_expr *
             (-(*this->p_ff_diffusion_rate_)[idxface]) * mesh.GetArea(idxface);
       }
     }
@@ -173,10 +187,16 @@ class ConvectionDiffusionScalarImplicit :
       IdxCell idxcell(i);
       Expr& eqn = fc_system_[idxcell];
       if (!mesh.IsExcluded(idxcell)) {
-        Expr flux_sum;
+        Expr cflux_sum;
         for (size_t i = 0; i < mesh.GetNumNeighbourFaces(idxcell); ++i) {
           IdxFace idxface = mesh.GetNeighbourFace(idxcell, i);
-          flux_sum += ff_flux_[idxface] * mesh.GetOutwardFactor(idxcell, i);
+          cflux_sum += ff_cflux_[idxface] * mesh.GetOutwardFactor(idxcell, i);
+        }
+
+        Expr dflux_sum;
+        for (size_t i = 0; i < mesh.GetNumNeighbourFaces(idxcell); ++i) {
+          IdxFace idxface = mesh.GetNeighbourFace(idxcell, i);
+          dflux_sum += ff_dflux_[idxface] * mesh.GetOutwardFactor(idxcell, i);
         }
 
         auto dt = this->GetTimeStep();
@@ -189,8 +209,9 @@ class ConvectionDiffusionScalarImplicit :
             coeffs[0] * fc_field_.time_prev[idxcell] +
             coeffs[1] * fc_field_.time_curr[idxcell]);
 
-        eqn = (unsteady + flux_sum / mesh.GetVolume(idxcell)) *
-              ((*this->p_fc_scaling_)[idxcell]) -
+        eqn = (unsteady + cflux_sum / mesh.GetVolume(idxcell)) *
+              ((*this->p_fc_scaling_)[idxcell]) +
+              dflux_sum / mesh.GetVolume(idxcell) -
               Expr((*this->p_fc_source_)[idxcell]);
 
         // Convert to delta-form
