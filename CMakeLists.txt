@@ -24,7 +24,7 @@ if (NOT DEFINED MODULE_HYDRO_2D)
   set(MODULE_HYDRO_2D ON)
 endif()
 if (NOT DEFINED MODULE_HYDRO_3D)
-  set(MODULE_HYDRO_3D ON)
+  set(MODULE_HYDRO_3D OFF)
 endif()
 
 # Module selection definitions
