@@ -742,9 +742,9 @@ void hydro<Mesh>::InitOutput() {
 
   std::string field_output_format = P_string["field_output_format"];
   if (field_output_format == "tecplot_binary") {
-    session = std::make_shared<output::SessionTecplotBinaryStructured<Mesh>>(
-        content, P_string[_plt_title], outmesh,
-        P_string["filename_field"] + ".plt");
+    //session = std::make_shared<output::SessionTecplotBinaryStructured<Mesh>>(
+    //    content, P_string[_plt_title], outmesh,
+    //    P_string["filename_field"] + ".plt");
   } else if (field_output_format == "paraview") {
     session = std::make_shared<output::SessionParaviewStructured<Mesh>>(
         content, P_string[_plt_title],

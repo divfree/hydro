@@ -1,4 +1,5 @@
-cmake_minimum_required(VERSION 3.1.0 FATAL_ERROR)
+#cmake_minimum_required(VERSION 3.1.0 FATAL_ERROR)
+cmake_minimum_required(VERSION 2.8.0 FATAL_ERROR)
 
 # Default revision tag
 file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/tools/revision.cpp"
@@ -76,7 +77,8 @@ endif()
 
 # GCC warnings and optimizations
 if (UNIX)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -pedantic")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -pedantic -std=c++11")
+  #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -pedantic")
   if (DEBUG)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O0 -g")
   else()
@@ -140,18 +142,18 @@ if (STATIC_BUILD)
 endif()
 
 # Tecplot
-if (DEFINED TECPLOT)
-  set(TECPLOT_DIR ${TECPLOT})
-else()
-  set(TECPLOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/lib/tecio")
-endif()
-include_directories(${TECPLOT_DIR}/include)
-find_library(TECIO_LIBRARY 
-             NAMES tecio
-             PATHS ${TECPLOT_DIR}/lib
-             NO_DEFAULT_PATH
-)
-set(LIBRARIES ${LIBRARIES} ${TECIO_LIBRARY})
+#if (DEFINED TECPLOT)
+#  set(TECPLOT_DIR ${TECPLOT})
+#else()
+#  set(TECPLOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/lib/tecio")
+#endif()
+#include_directories(${TECPLOT_DIR}/include)
+#find_library(TECIO_LIBRARY 
+#             NAMES tecio
+#             PATHS ${TECPLOT_DIR}/lib
+#             NO_DEFAULT_PATH
+#)
+#set(LIBRARIES ${LIBRARIES} ${TECIO_LIBRARY})
 
 # Threads
 find_package(Threads REQUIRED)
