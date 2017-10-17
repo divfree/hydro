@@ -39,17 +39,16 @@ string get_string_with_ws(istream& in)
 
 string get_current_directory()
 {
-  boost::filesystem::path full_path( boost::filesystem::current_path() );
-  return full_path.string();
+  //boost::filesystem::path full_path( boost::filesystem::current_path() );
+  //return full_path.string();
+  assert(false);
+  return "";
 }
 
 void set_current_directory(string path)
 {
-  boost::filesystem::current_path(path);
-  if(false)
-  {
-    throw string("Error "+IntToStr(errno));
-  }
+  //boost::filesystem::current_path(path);
+  assert(false);
 }
 
 string IntToStr(int a)
@@ -99,6 +98,8 @@ bool file_exists(string filename)
 
 bool directory_exists(string dirName)
 {
+  return true;
+  /*
   if (boost::filesystem::exists(dirName.c_str()) != 0)
   {
     if (errno == ENOENT || errno == ENOTDIR)
@@ -108,6 +109,7 @@ bool directory_exists(string dirName)
     return false;
   }
   return true;
+  */
 }
 
 bool ecast(bool* ptr)
@@ -339,6 +341,7 @@ int sysinfo::threads()
 
 void create_directory(string dirname)
 {
+  /*
   using namespace boost::filesystem;
 	path dir(dirname.c_str());
   try
@@ -350,13 +353,13 @@ void create_directory(string dirname)
     cout << ex.what() << '\n';
       throw string("Can't create the directory: '"+dirname+"'");
   }
+  */
+  assert(false);
 }
 
 void remove_file(string filename)
 {
-    boost::filesystem::wpath file(filename);
-    if(boost::filesystem::exists(file))
-            boost::filesystem::remove(file);
+  std::remove(filename.c_str());
 }
 
 double pow3(double x)

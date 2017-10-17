@@ -13,6 +13,8 @@
 #include "solver.hpp"
 #include "particle_system.hpp"
 
+#include <fstream>
+
 namespace solver {
 
 template <class Mesh>
@@ -379,6 +381,8 @@ class AdvectionSolverMultiExplicit :
   std::vector<geom::MapFace<std::shared_ptr<ConditionFace>>> v_mf_u_cond_;
   std::vector<const VelocityField*> v_p_ff_volume_flux_slip_;
   bool spatial_split_;
+  Scal sharp_;
+  std::vector<Scal> sharp_max_;
   // Common buffers:
   geom::FieldFace<Scal> ff_u_;
 
@@ -392,7 +396,7 @@ class AdvectionSolverMultiExplicit :
       const std::vector<const VelocityField*>& v_p_ff_volume_flux_slip,
       const std::vector<const geom::FieldCell<Scal>*>& v_p_fc_source,
       double time, double time_step,
-      bool spatial_split = true)
+      bool spatial_split = true, Scal sharp=1., std::vector<Scal> sharp_max=1.)
       : AdvectionSolverMulti<Mesh, VelocityField>(
           time, time_step, p_fn_velocity, v_p_fc_source)
       , mesh(mesh)
@@ -400,12 +404,15 @@ class AdvectionSolverMultiExplicit :
       , v_mf_u_cond_(v_mf_u_cond)
       , v_p_ff_volume_flux_slip_(v_p_ff_volume_flux_slip)
       , spatial_split_(spatial_split)
+      , sharp_(sharp)
+      , sharp_max_(sharp_max)
   {
     v_fc_u_.resize(num_fields_);
     v_mf_u_cond_.resize(num_fields_);
     for (size_t field = 0; field < num_fields_; ++field) {
       v_fc_u_[field].time_curr = v_fc_u_initial[field];
     }
+
   }
   void StartStep() override {
     this->ClearIterationCount();
@@ -471,11 +478,44 @@ class AdvectionSolverMultiExplicit :
         }
       }
 
+      // Interface sharpening
+      // zero-derivative bc for Vect
+      geom::MapFace<std::shared_ptr<ConditionFace>> mfvz;
+      for (auto idxface : mesh.Faces()) {
+        if (!mesh.IsExcluded(idxface) && !mesh.IsInner(idxface)) {
+          mfvz[idxface] =
+              std::make_shared<ConditionFaceDerivativeFixed<Vect>>(Vect(0));
+        }
+      }
+      auto af = Interpolate(curr, v_mf_u_cond_[field], mesh);
+      auto gc = Gradient(af, mesh);
+      auto gf = Interpolate(gc, mfvz, mesh);
+      geom::FieldFace<Vect> ff(mesh, Vect(0.));
+      for (auto idxface : mesh.Faces()) {
+        auto n = gf[idxface];
+        n /= (n.norm() + 1e-6);
+        ff[idxface] = n * (sharp_ * af[idxface] * 
+                (1. - af[idxface] / sharp_max_[field]));
+      }
+
       // Apply sources
       for (auto idxcell : mesh.Cells()) {
         curr[idxcell] +=
             this->GetTimeStep() * (*this->v_p_fc_source_[field])[idxcell];
+
+        // sharpening
+        for (size_t i = 0; i < mesh.GetNumNeighbourFaces(idxcell); ++i) {
+          IdxFace idxface = mesh.GetNeighbourFace(idxcell, i);
+          curr[idxcell] += this->GetTimeStep() * 
+            mesh.GetOutwardSurface(idxcell, i).dot(ff[idxface]);
+        }
       }
+
+      // Normalize
+      //for (auto idxcell : mesh.Cells()) {
+      //  auto& c = curr[idxcell];
+      //  c = std::max(0., std::min(sharp_max_[field], c));
+      //}
     }
     this->IncIterationCount();
   }

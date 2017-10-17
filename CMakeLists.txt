@@ -24,7 +24,7 @@ if (NOT DEFINED MODULE_HYDRO_2D)
   set(MODULE_HYDRO_2D ON)
 endif()
 if (NOT DEFINED MODULE_HYDRO_3D)
-  set(MODULE_HYDRO_3D ON)
+  set(MODULE_HYDRO_3D OFF)
 endif()
 
 # Module selection definitions
@@ -54,18 +54,6 @@ set(BINARY_NAME "hydro")
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)  
 
-# Boost libraries
-set(Boost_USE_STATIC_RUNTIME ON)
-set(Boost_USE_STATIC_LIBS ON)
-set(Boost_USE_MULTITHREADED ON)
-find_package(Boost REQUIRED 
-  COMPONENTS system
-             filesystem
-)
-link_directories(${Boost_LIBRARY_DIRS})
-include_directories(${Boost_INCLUDE_DIRS})
-set(LIBRARIES ${LIBRARIES} ${Boost_LIBRARIES})
-                     
 # OpenMP support                              
 find_package(OpenMP)
 if (OPENMP_FOUND)

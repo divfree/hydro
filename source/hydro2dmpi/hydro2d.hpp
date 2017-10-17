@@ -95,6 +95,7 @@ class hydro : public TModule
   FieldCell<Vect> fc_force;
   FieldCell<Scal> fc_c1_smooth, fc_c1_laplacian;
   FieldCell<Scal> fc_radiation;
+  FieldCell<Scal> fc_curv_;
   geom::MapFace<std::shared_ptr<solver::ConditionFace>> mf_cond_radiation_shared;
   std::vector<geom::MapFace<std::shared_ptr<solver::ConditionFace>>>
   v_mf_partial_density_cond_;
@@ -166,6 +167,12 @@ hydro<Mesh>::GetLinearSolverFactory(std::string linear_name,
   } else if (linear_name == "gauss_seidel") {
     return std::make_shared<const solver::LinearSolverFactory>(
         std::make_shared<const solver::GaussSeidelFactory>(
+            P_double["lu_relaxed_tolerance"],
+            P_int["lu_relaxed_num_iters_limit"],
+            P_double["lu_relaxed_relaxation_factor"]));
+  } else if (linear_name == "jacobi") {
+    return std::make_shared<const solver::LinearSolverFactory>(
+        std::make_shared<const solver::JacobiFactory>(
             P_double["lu_relaxed_tolerance"],
             P_int["lu_relaxed_num_iters_limit"],
             P_double["lu_relaxed_relaxation_factor"]));
@@ -263,7 +270,17 @@ void hydro<Mesh>::InitFluidSolver() {
   if (P_vect.exist("initial_velocity")) {
     initial_velocity = GetVect<Vect>(P_vect["initial_velocity"]);
   }
+
   FieldCell<Vect> fc_velocity_initial(mesh, initial_velocity);
+  if (flag("initial_pois")) {
+    logger() << "use initial pois";
+    Vect& u0 = initial_velocity;
+    for (auto idx : mesh.Cells()) {
+      Vect x = mesh.GetCenter(idx);
+      auto& v = fc_velocity_initial[idx];
+      v[0] = x[1] * (1. - x[1]) * 4. * u0[0];
+    }
+  }
   if (P_bool["deforming_velocity"]) {
     fc_velocity_initial = solver::GetDeformingVelocity(mesh);
   }
@@ -405,11 +422,15 @@ void hydro<Mesh>::InitAdvectionSolver() {
                     GetVect<Vect>(P_vect["B1"]));
   geom::Rect<Vect> block2(GetVect<Vect>(P_vect["A2"]),
                     GetVect<Vect>(P_vect["B2"]));
+  Vect IC(GetVect<Vect>(P_vect["IC"]));
+  Scal IR(P_double["IR"]);
   for (auto idx : mesh.Cells()) {
     Vect x = mesh.GetCenter(idx);
     if (block2.IsInside(x)) {
       v_fc_partial_density_initial[2][idx] = v_fc_true_density[2][idx];
     } else if (block1.IsInside(x)) {
+      v_fc_partial_density_initial[1][idx] = v_fc_true_density[1][idx];
+    } else if (x.dist(IC) < IR) {
       v_fc_partial_density_initial[1][idx] = v_fc_true_density[1][idx];
     }
   }
@@ -467,7 +488,8 @@ void hydro<Mesh>::InitAdvectionSolver() {
         &fluid_solver->GetVolumeFlux(solver::Layers::iter_curr),
         v_p_ff_volume_flux_slip,
         v_p_fc_mass_source,
-        0., dt * P_double["advection_dt_factor"], P_bool["tvd_split"]);
+        0., dt * P_double["advection_dt_factor"], P_bool["tvd_split"],
+        P_double["sharp"], v_true_density);
   } else if (advection_solver_name == "pic") {
     advection_solver = std::make_shared<solver::
         AdvectionSolverMultiParticles<Mesh, FieldFace<Scal>>>(
@@ -618,6 +640,9 @@ void hydro<Mesh>::InitOutput() {
           "excluded", outmesh, [this](IdxCell idx) {
               return mesh.IsExcluded(out_to_mesh_[idx]) ? 1. : 0.; })
       , std::make_shared<output::EntryFunction<Scal, IdxCell, Mesh>>(
+          "curvature", outmesh, [this](IdxCell idx) {
+              return fc_curv_[out_to_mesh_[idx]]; })
+      , std::make_shared<output::EntryFunction<Scal, IdxCell, Mesh>>(
           "divergence", outmesh, [this](IdxCell idx) {
               auto idxcell = out_to_mesh_[idx];
               Scal sum = 0.;
@@ -730,6 +755,15 @@ void hydro<Mesh>::InitOutput() {
                                "stat_volume_out_" + phase));
   }
 
+  // min/max scalar output
+  for (auto i : phases) {
+    std::string phase = IntToStr(i);
+    content_scalar.push_back(P("pd_min_" + phase,
+                               "stat_pd_min_" + phase));
+    content_scalar.push_back(P("pd_max_" + phase,
+                               "stat_pd_max_" + phase));
+  }
+
   if (!P_string.exist(_plt_title)) {
     P_string.set(_plt_title, P_string[_exp_name]);
   }
@@ -822,6 +856,11 @@ void hydro<Mesh>::CalcPhasesVolumeFraction() {
           v_fc_true_density[i][idxcell];
       sum += v_fc_volume_fraction[i][idxcell];
     }
+    for (auto i : phases) {
+      v_fc_volume_fraction[i][idxcell] /= sum;
+    }
+
+    //assert(std::abs(sum - 1.) < 1e-3);
   }
 }
 
@@ -1137,10 +1176,45 @@ void hydro<Mesh>::CalcRadiation() {
 template<class Mesh>
 void hydro<Mesh>::CalcForce() {
   Vect gravity = GetVect<Vect>(P_vect["gravity"]);
+  Vect force = GetVect<Vect>(P_vect["force"]);
   fc_force.Reinit(mesh);
   for (auto idxcell : mesh.Cells()) {
-    fc_force[idxcell] = gravity * fc_density[idxcell];
+    fc_force[idxcell] = gravity * fc_density[idxcell] + force;
   }
+
+  // surface tension
+  if (num_phases >= 2) {
+    auto a = v_fc_volume_fraction[1];
+    a = solver::GetSmoothField(a, mesh, 1);
+
+    auto& cond = v_mf_partial_density_cond_[0];
+    auto af = solver::Interpolate(a, cond, mesh);
+    auto gc = solver::Gradient(af, mesh);
+    // zero-derivative bc for Vect
+    geom::MapFace<std::shared_ptr<solver::ConditionFace>> mfvz;
+    for (auto idxface : mesh.Faces()) {
+      if (!mesh.IsExcluded(idxface) && !mesh.IsInner(idxface)) {
+        mfvz[idxface] =
+            std::make_shared<solver::ConditionFaceDerivativeFixed<Vect>>(Vect(0));
+      }
+    }
+    auto gf = solver::Interpolate(gc, mfvz, mesh);
+    fc_curv_.Reinit(mesh, 0.);
+    auto sigma = P_double["sigma"];
+    for (auto idxcell : mesh.Cells()) {
+      Vect f(0);
+      for (size_t i = 0; i < mesh.GetNumNeighbourFaces(idxcell); ++i) {
+        IdxFace idxface = mesh.GetNeighbourFace(idxcell, i);
+        auto g = gf[idxface];
+        auto n = gf[idxface];
+        n /= (n.norm() + 1e-6); 
+        f += g * mesh.GetOutwardSurface(idxcell, i).dot(n);
+      }
+      f /= mesh.GetVolume(idxcell);
+      fc_force[idxcell] += f * sigma;
+    }
+  }
+
   fc_force = solver::GetSmoothField(fc_force, mesh,
                                     P_int["force_smooth_times"]);
 }
@@ -1204,13 +1278,20 @@ void hydro<Mesh>::CalcStat() {
   for (auto i : phases) {
     Scal density = v_true_density[i];
     Scal volume = 0.;
+    Scal pd_min = 1e10;
+    Scal pd_max = -1e10;
     for (auto idxcell : mesh.Cells()) {
       Scal c = v_fc_volume_fraction[i][idxcell];
       volume += c * mesh.GetVolume(idxcell);
+      auto pd = advection_solver->GetField(i)[idxcell];
+      pd_min = std::min(pd_min, pd);
+      pd_max = std::max(pd_max, pd);
     }
     Scal mass = volume * density;
     P_double.set("stat_volume_" + IntToStr(i), volume);
     P_double.set("stat_mass_" + IntToStr(i), mass);
+    P_double.set("stat_pd_min_" + IntToStr(i), pd_min);
+    P_double.set("stat_pd_max_" + IntToStr(i), pd_max);
 
     Scal volume_flux_in = 0.;
     Scal volume_flux_out = 0.;

@@ -30,6 +30,8 @@ set double dt 0.01
 # physical parameters
 set int num_phases 1
 set vect gravity (0., 0, 0)
+set vect force (0., 0., 0.)
+set double sigma 0.
 set double density_0 1
 set double density_1 1
 set double density_2 1

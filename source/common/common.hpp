@@ -1,8 +1,8 @@
 #pragma once
 
 #include <cmath>
-#include <boost/filesystem.hpp>
 #include "std_ref.hpp"
+#include <cstdio>
 
 string get_time(string fmt);
 string get_string_with_ws(istream& in);

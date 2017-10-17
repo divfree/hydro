@@ -6,6 +6,7 @@
 #include <vector>
 #include <array>
 #include <string>
+#include <cassert>
 
 using std::string;
 using std::istream;

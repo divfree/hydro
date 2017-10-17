@@ -854,12 +854,14 @@ class FluidSimple : public FluidSolver<Mesh> {
       if (!is_boundary_[idxface] && !mesh.IsExcluded(idxface)) {
         IdxCell cm = mesh.GetNeighbourCell(idxface, 0);
         IdxCell cp = mesh.GetNeighbourCell(idxface, 1);
+        Vect dm = mesh.GetVectToCell(idxface, 0);
+        Vect dp = mesh.GetVectToCell(idxface, 1);
         const auto pressure_surface_derivative_wide =
             (ff_pressure_grad_[idxface] -
             ff_ext_force_restored_[idxface]).dot(mesh.GetSurface(idxface));
         const auto pressure_surface_derivative_compact =
             (fc_pressure_prev[cp] - fc_pressure_prev[cm]) /
-            mesh.GetCenter(cp).dist(mesh.GetCenter(cm)) *
+            (dp - dm).norm() *
             mesh.GetArea(idxface) -
             ff_ext_force_[idxface].dot(mesh.GetSurface(idxface));
         //const auto mmim = (1. - velocity_relaxation_factor_) *
@@ -892,11 +894,14 @@ class FluidSimple : public FluidSolver<Mesh> {
       if (!is_boundary_[idxface] && !mesh.IsExcluded(idxface)) {
         IdxCell cm = mesh.GetNeighbourCell(idxface, 0);
         IdxCell cp = mesh.GetNeighbourCell(idxface, 1);
+        Vect dm = mesh.GetVectToCell(idxface, 0);
+        Vect dp = mesh.GetVectToCell(idxface, 1);
         auto coeff = - mesh.GetArea(idxface) /
-            ((mesh.GetCenter(cp) - mesh.GetCenter(cm)).norm() *
-            ff_diag_coeff_[idxface]);
+            ((dp - dm).norm() * ff_diag_coeff_[idxface]);
         expr.InsertTerm(-coeff, cm);
         expr.InsertTerm(coeff, cp);
+        // adhoc for periodic
+        expr.SortTerms(true);
       }
       expr.SetConstant(ff_volume_flux_asterisk_[idxface]);
     }

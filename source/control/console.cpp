@@ -566,6 +566,7 @@ void TConsole::cmd_cd(string arg) {
 }
 
 void TConsole::cmd_dir(string arg) {
+  /*
   using namespace boost::filesystem;
   stringstream buf;
   buf.str(arg);
@@ -581,6 +582,8 @@ void TConsole::cmd_dir(string arg) {
   {
     cout << ex.what() << '\n';
   }
+  */
+  assert(false);
 }
 
 void TConsole::cmd_sleep(string arg) {
