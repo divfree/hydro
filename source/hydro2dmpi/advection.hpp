@@ -396,7 +396,7 @@ class AdvectionSolverMultiExplicit :
       const std::vector<const VelocityField*>& v_p_ff_volume_flux_slip,
       const std::vector<const geom::FieldCell<Scal>*>& v_p_fc_source,
       double time, double time_step,
-      bool spatial_split = true, Scal sharp=1., std::vector<Scal> sharp_max=1.)
+      bool spatial_split, Scal sharp, std::vector<Scal> sharp_max)
       : AdvectionSolverMulti<Mesh, VelocityField>(
           time, time_step, p_fn_velocity, v_p_fc_source)
       , mesh(mesh)
@@ -490,12 +490,17 @@ class AdvectionSolverMultiExplicit :
       auto af = Interpolate(curr, v_mf_u_cond_[field], mesh);
       auto gc = Gradient(af, mesh);
       auto gf = Interpolate(gc, mfvz, mesh);
-      geom::FieldFace<Vect> ff(mesh, Vect(0.));
+      geom::FieldFace<Scal> ff(mesh, 0);
       for (auto idxface : mesh.Faces()) {
         auto n = gf[idxface];
         n /= (n.norm() + 1e-6);
-        ff[idxface] = n * (sharp_ * af[idxface] * 
-                (1. - af[idxface] / sharp_max_[field]));
+        auto nf = n.dot(mesh.GetNormal(idxface));
+        auto uf = ff_volume_flux[idxface];
+        auto am = sharp_max_[field];
+        auto epsh = sharp_ * mesh.GetArea(idxface);
+        ff[idxface] = std::abs(uf * nf) * nf * 
+          (epsh * gf[idxface].norm() - af[idxface] * 
+                (1. - af[idxface] / am));
       }
 
       // Apply sources
@@ -504,11 +509,12 @@ class AdvectionSolverMultiExplicit :
             this->GetTimeStep() * (*this->v_p_fc_source_[field])[idxcell];
 
         // sharpening
+        Scal sh = 0.;
         for (size_t i = 0; i < mesh.GetNumNeighbourFaces(idxcell); ++i) {
           IdxFace idxface = mesh.GetNeighbourFace(idxcell, i);
-          curr[idxcell] += this->GetTimeStep() * 
-            mesh.GetOutwardSurface(idxcell, i).dot(ff[idxface]);
+          sh += mesh.GetOutwardFactor(idxcell, i) * ff[idxface];
         }
+        curr[idxcell] += this->GetTimeStep() * sh / mesh.GetVolume(idxcell);
       }
 
       // Normalize
