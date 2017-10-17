@@ -18,7 +18,7 @@ namespace mkl {
 
 #include <vector>
 #include <array>
-#include <boost/container/static_vector.hpp>
+//#include <boost/container/static_vector.hpp>
 #include <iostream>
 #include <cstdint>
 #include <memory>
@@ -30,6 +30,7 @@ template <class Scal, class Idx>
 struct Term {
   Scal coeff;
   Idx idx;
+  Term() = default;
   Term(Scal coeff, Idx idx)
       : coeff(coeff)
       , idx(idx)
@@ -51,11 +52,12 @@ class Expression {
 
  private:
   static constexpr size_t ExprSize = _ExprSize;
-  using TermContainer =
-      boost::container::static_vector<TermType, ExprSize>;
+  using TermContainer = std::array<TermType, ExprSize>;
+      //boost::container::static_vector<TermType, ExprSize>;
   TermContainer terms_;
   Scal constant_;
   bool sorted_;
+  size_t size_;
   template <class OtherScal, class OtherIdx, size_t OtherExprSize>
   friend class Expression;
 
@@ -63,45 +65,50 @@ class Expression {
   Expression()
       : constant_(0)
       , sorted_(true)
+      , size_(0)
   {}
   template <class OtherScal, class OtherIdx, size_t OtherExprSize>
   Expression(const Expression<OtherScal, OtherIdx, OtherExprSize>& other)
-      : terms_(other.terms_.begin(), other.terms_.end()),
+      : terms_(other.terms_),
         constant_(other.constant_),
-        sorted_(other.sorted_) {}
+        sorted_(other.sorted_),
+        size_(other.size_) { }
   explicit Expression(Scal constant)
       : constant_(constant)
       , sorted_(true)
+      , size_(0)
   {}
   explicit Expression(const TermType& term)
       : terms_{term},
         constant_(0.),
-        sorted_(true) {}
+        sorted_(true),
+        size_(1)
+  {}
   void Clear() {
     constant_ = 0;
-    terms_.clear();
     sorted_ = true;
+    size_ = 0;
   }
   size_t size() const {
-    return terms_.size();
+    return size_;
   }
   bool empty() const {
-    return terms_.empty();
+    return size_ == 0;
   }
   TermType& operator[](size_t k) {
 #ifdef __RANGE_CHECK
-    assert(k >=0 && k < terms_.size());
+    assert(k >=0 && k < size_);
 #endif
     return terms_[k];
   }
   const TermType& operator[](size_t k) const {
 #ifdef __RANGE_CHECK
-    assert(k >=0 && k < terms_.size());
+    assert(k >=0 && k < size_);
 #endif
     return terms_[k];
   }
   void InsertTerm(const TermType& term) {
-    terms_.push_back(term);
+    terms_[size_++] = term;
     sorted_ = false;
     // adhoc periodic
     SortTerms(true);
@@ -121,27 +128,27 @@ class Expression {
   template <class Field, class Value = typename Field::ValueType>
   Value Evaluate(const Field& field) const {
     Value res(constant_);
-    for (auto& term : terms_) {
-      res += field[term.idx] * term.coeff;
+    for (size_t i = 0; i < size_; ++i) {
+      res += field[terms_[i].idx] * terms_[i].coeff;
     }
     return res;
   }
   Scal CoeffSum() const {
     Scal res = 0.;
-    for (auto& term : terms_) {
-      res += term.coeff;
+    for (size_t i = 0; i < size_; ++i) {
+      res += terms_[i].coeff;
     }
     return res;
   }
   void SortTerms(bool force = false) {
     if (!sorted_ || force) {
-      std::sort(terms_.begin(), terms_.end());
+      std::sort(terms_.begin(), terms_.begin() + size_);
       sorted_ = true;
     }
   }
   Expression& operator*=(Scal k) {
-    for (auto& term : terms_) {
-      term.coeff *= k;
+    for (size_t i = 0; i < size_; ++i) {
+      terms_[i].coeff *= k;
     }
     constant_ *= k;
     return *this;
@@ -152,8 +159,8 @@ class Expression {
     return tmp;
   }
   Expression& operator/=(Scal k) {
-    for (auto& term : terms_) {
-      term.coeff /= k;
+    for (size_t i = 0; i < size_; ++i) {
+      terms_[i].coeff /= k;
     }
     constant_ /= k;
     return *this;
@@ -168,15 +175,18 @@ class Expression {
     Expression& b = other;
 
     if (a.empty()) {
-      a.terms_ = std::move(b.terms_);
+      std::swap(a.terms_, b.terms_);
+      std::swap(a.size_, b.size_);
     } else if (b.empty()) {
       // nop
     } else {
       a.SortTerms();
       b.SortTerms();
       TermContainer ab;
+      size_t absize = 0;
       auto a_it = a.terms_.cbegin(), b_it = b.terms_.cbegin();
-      const auto a_end = a.terms_.cend(), b_end = b.terms_.cend();
+      const auto a_end = a.terms_.cbegin() + a.size_;
+      const auto b_end = b.terms_.cbegin() + b.size_;
 
       while (a_it != a_end || b_it != b_end) {
         auto sample = (a_it != a_end && (b_it == b_end || *a_it < *b_it))
@@ -191,9 +201,10 @@ class Expression {
           sum += b_it->coeff;
           ++b_it;
         }
-        ab.push_back(TermType(sum, sample.idx));
+        ab[absize++] = TermType(sum, sample.idx);
       }
-      a.terms_ = std::move(ab);
+      std::swap(a.terms_, ab);
+      std::swap(a.size_, absize);
       a.sorted_ = true;
     }
 
@@ -216,7 +227,7 @@ class Expression {
     return tmp;
   }
   size_t Find(Idx idx) const {
-    for (size_t i = 0; i < terms_.size(); ++i) {
+    for (size_t i = 0; i < size_; ++i) {
       if (terms_[i].idx == idx) {
         return i;
       }
@@ -224,25 +235,29 @@ class Expression {
     return -1;
   }
   void SetKnownValue(Idx idx, Scal value) {
-    TermContainer new_terms_;
-    for (auto& term : terms_) {
-      if (term.idx == idx) {
-        constant_ += value * term.coeff;
+    TermContainer new_terms;
+    size_t newsize = 0;
+    for (size_t i = 0; i < size_; ++i) {
+      if (terms_[i].idx == idx) {
+        constant_ += value * terms_[i].coeff;
       } else {
-        new_terms_.push_back(term);
+        new_terms[newsize++] = terms_[i];
       }
     }
-    terms_ = new_terms_;
+    std::swap(terms_, new_terms);
+    std::swap(size_, newsize);
   }
   void RestrictTerms(Idx lower, Idx upper) {
-    TermContainer new_terms_;
-    for (auto& term : terms_) {
-      if (lower.GetRaw() <= term.idx.GetRaw() &&
-          term.idx.GetRaw() <= upper.GetRaw()) {
-        new_terms_.push_back(term);
+    TermContainer new_terms;
+    size_t newsize = 0;
+    for (size_t i = 0; i < size_; ++i) {
+      if (lower.GetRaw() <= terms_[i].idx.GetRaw() &&
+          terms_[i].idx.GetRaw() <= upper.GetRaw()) {
+        new_terms[newsize++] = terms_[i];
       }
     }
-    terms_ = new_terms_;
+    std::swap(terms_, new_terms);
+    std::swap(size_, newsize);
   }
 };
 
