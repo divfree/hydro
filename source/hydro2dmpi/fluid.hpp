@@ -192,6 +192,10 @@ class ConvectionDiffusionImplicit : public ConvectionDiffusion<Mesh> {
   const geom::FieldCell<Expr>& GetVelocityEquations(size_t comp) override {
     return v_solver_[comp]->GetEquations();
   }
+  geom::MapFace<std::shared_ptr<ConditionFace>>&
+  GetVelocityCond(size_t comp) {
+    return v_mf_velocity_cond_[comp];
+  }
 };
 
 template <class Mesh>
@@ -800,11 +804,34 @@ class FluidSimple : public FluidSolver<Mesh> {
         fc_pressure_grad_, mf_pressure_grad_cond_, mesh);
     timer_->Pop();
 
+    // initialize force with zero
+    fc_force_.Reinit(mesh, Vect(0));
+    // append viscous term
+    timer_->Push("fluid.1a.explicit-viscosity");
+    for (size_t n = 0; n < dim; ++n) {
+      geom::FieldCell<Scal> fc = GetComponent(
+          conv_diff_solver_->GetVelocity(Layers::iter_curr), n);
+      auto ff = Interpolate(fc, conv_diff_solver_->GetVelocityCond(n), mesh);
+      auto gc = Gradient(ff, mesh);
+      auto gf = Interpolate(gc, mf_force_cond_, mesh); // adhoc: zero-der cond
+      for (auto idxcell : mesh.Cells()) {
+        Vect sum = Vect::kZero;
+        for (size_t i = 0; i < mesh.GetNumNeighbourFaces(idxcell); ++i) {
+          IdxFace idxface = mesh.GetNeighbourFace(idxcell, i);
+          sum += gf[idxface] * (ff_kinematic_viscosity_[idxface] * 
+              mesh.GetOutwardSurface(idxcell, i)[n]);
+        }
+        fc_force_[idxcell] += sum / mesh.GetVolume(idxcell);
+      }
+    }
+    timer_->Pop();
+
+    // append to force
 #pragma omp parallel for
     for (IntIdx i = 0; i < static_cast<IntIdx>(mesh.Cells().size()); ++i) {
       IdxCell idxcell(i);
     //for (auto idxcell : mesh.Cells()) {
-      fc_force_[idxcell] =
+      fc_force_[idxcell] +=
           fc_pressure_grad_[idxcell] * (-1.) +
           fc_ext_force_restored_[idxcell] +
           // Volume source momentum compensation:
