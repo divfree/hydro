@@ -491,16 +491,18 @@ class AdvectionSolverMultiExplicit :
       auto gc = Gradient(af, mesh);
       auto gf = Interpolate(gc, mfvz, mesh);
       geom::FieldFace<Scal> ff(mesh, 0);
-      for (auto idxface : mesh.Faces()) {
-        auto n = gf[idxface];
-        n /= (n.norm() + 1e-6);
-        auto nf = n.dot(mesh.GetNormal(idxface));
-        auto uf = ff_volume_flux[idxface];
-        auto am = sharp_max_[field];
-        auto epsh = sharp_ * mesh.GetArea(idxface);
-        ff[idxface] = std::abs(uf * nf) * nf * 
-          (epsh * gf[idxface].norm() - af[idxface] * 
-                (1. - af[idxface] / am));
+      if (std::abs(sharp_) > 1e-10) {
+        for (auto idxface : mesh.Faces()) {
+          auto n = gf[idxface];
+          n /= (n.norm() + 1e-6);
+          auto nf = n.dot(mesh.GetNormal(idxface));
+          auto uf = ff_volume_flux[idxface];
+          auto am = sharp_max_[field];
+          auto epsh = sharp_ * mesh.GetArea(idxface);
+          ff[idxface] = std::abs(uf * nf) * nf * 
+            (epsh * gf[idxface].norm() - af[idxface] * 
+                  (1. - af[idxface] / am));
+        }
       }
 
       // Apply sources
