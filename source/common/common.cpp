@@ -1,4 +1,7 @@
 #include "common.hpp"
+#include <cstdio>
+#include <unistd.h>
+#include <linux/limits.h>
 
 string get_time(string fmt)
 {
@@ -39,10 +42,10 @@ string get_string_with_ws(istream& in)
 
 string get_current_directory()
 {
-  //boost::filesystem::path full_path( boost::filesystem::current_path() );
-  //return full_path.string();
-  assert(false);
-  return "";
+  const size_t pm = PATH_MAX;
+  char path[pm];
+  getcwd(path, pm);
+  return std::string(path);
 }
 
 void set_current_directory(string path)
