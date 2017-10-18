@@ -127,8 +127,8 @@ set int max_num_particles 10
 set double back_relaxation_factor 1
 
 # output
-set string field_output_format tecplot_binary
-# set string field_output_format paraview
+#set string field_output_format tecplot_binary
+set string field_output_format paraview
 set int max_frame_index 100
 set int max_frame_scalar_index 10000
 set bool no_output 0

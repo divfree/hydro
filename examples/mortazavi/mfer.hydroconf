@@ -1,0 +1,52 @@
+set string plt_title "Mortazavi"
+
+# domain
+set vect A (0, 0)
+set vect B (1,1)
+
+# initial drop
+set vect IC (0.5, 0.825)
+set double IR 0.125
+
+# initial velocity
+set vect initial_velocity (1, 0)
+set bool initial_pois 1
+
+set string condition_top    "wall 0 0 0"
+set string condition_bottom "wall 0 0 0"
+
+# (periodic hard-coded)
+#set string condition_left    "wall 0 0 0"
+#set string condition_right   "wall 0 0 0"
+
+# mesh
+set int Nx 64
+set int Ny 64
+
+# time
+set double T 40.
+set double dt 0.01
+
+# physical parameters
+set int num_phases 2
+set vect gravity (0, 0, 0)
+set vect force (0.2, 0, 0)
+set double density_0 1.
+set double density_1 8.
+set double viscosity_0 0.025
+set double viscosity_1 0.2
+set double sigma -0.5
+
+# numerical parameters
+set int initial_volume_fraction_smooth_times 0
+set int density_smooth_times 0
+set int viscosity_smooth_times 0
+set bool simpler 0
+set double sharp 0.3
+set double convergence_tolerance 1e-4
+set double lu_relaxed_tolerance 1e-5
+
+# output
+set string field_output_format paraview
+set int max_frame_index $(T)0
+

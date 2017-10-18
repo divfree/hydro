@@ -1,0 +1,17 @@
+#!/bin/sh
+
+set -e
+
+if [[ -f hydro3.pid ]] ; then
+  pid=`cat hydro3.pid`
+  if ps -p $pid > /dev/null ; then
+    echo "Error: hydro3 running. No action."
+    exit
+  fi
+fi
+
+rm -f hydro3.lock
+rm -f hydro3.pid
+rm -f tp1*
+rm -f *.vts
+rm -f *.pvd
