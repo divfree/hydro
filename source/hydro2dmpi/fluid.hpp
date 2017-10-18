@@ -473,6 +473,7 @@ class FluidSimple : public FluidSolver<Mesh> {
   geom::FieldFace<Vect> ff_ext_force_;
   geom::FieldCell<Vect> fc_ext_force_restored_;
   geom::FieldFace<Vect> ff_ext_force_restored_;
+  geom::FieldFace<Vect> ff_stforce_restored_;
   // / needed for MMIM, now disabled
   //geom::FieldFace<Vect> ff_velocity_iter_prev_;
 
@@ -596,6 +597,9 @@ class FluidSimple : public FluidSolver<Mesh> {
     // Interpolate force to faces (considered as given force)
     ff_ext_force_ = Interpolate(
         *this->p_fc_force_, mf_force_cond_, mesh,
+        force_geometric_average_);
+    ff_stforce_restored_ = Interpolate(
+        *this->p_fc_stforce_, mf_force_cond_, mesh,
         force_geometric_average_);
     fc_ext_force_restored_.Reinit(mesh);
 
@@ -843,6 +847,7 @@ class FluidSimple : public FluidSolver<Mesh> {
       fc_force_[idxcell] +=
           fc_pressure_grad_[idxcell] * (-1.) +
           fc_ext_force_restored_[idxcell] +
+          (*this->p_fc_stforce_)[idxcell] +
           // Volume source momentum compensation:
           conv_diff_solver_->GetVelocity(Layers::iter_curr)[idxcell] *
           ((*this->p_fc_density_)[idxcell] *
@@ -893,11 +898,12 @@ class FluidSimple : public FluidSolver<Mesh> {
         Vect dp = mesh.GetVectToCell(idxface, 1);
         const auto pressure_surface_derivative_wide =
             (ff_pressure_grad_[idxface] -
+            ff_stforce_restored_[idxface] -
             ff_ext_force_restored_[idxface]).dot(mesh.GetSurface(idxface));
         const auto pressure_surface_derivative_compact =
             (fc_pressure_prev[cp] - fc_pressure_prev[cm]) /
-            (dp - dm).norm() *
-            mesh.GetArea(idxface) -
+            (dp - dm).norm() * mesh.GetArea(idxface) -
+            (*this->p_ff_stforce_)[idxface].dot(mesh.GetNormal(idxface)) - 
             ff_ext_force_[idxface].dot(mesh.GetSurface(idxface));
         //const auto mmim = (1. - velocity_relaxation_factor_) *
         //    (ff_vol_flux_.iter_prev[idxface] -
