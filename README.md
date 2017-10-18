@@ -11,7 +11,10 @@
 ## Run example
 
     cd examples/mortazavi
-    ./run
+    ./run    # runs with nohup in background
+
+## Plot
+
     ./plot   # requires mfer
 
 
