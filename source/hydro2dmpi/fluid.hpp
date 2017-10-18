@@ -209,6 +209,8 @@ class FluidSolver : public UnsteadyIterativeSolver {
   geom::FieldCell<Scal>* p_fc_density_;
   geom::FieldCell<Scal>* p_fc_viscosity_;
   geom::FieldCell<Vect>* p_fc_force_;
+  geom::FieldCell<Vect>* p_fc_stforce_;
+  geom::FieldFace<Vect>* p_ff_stforce_;
   geom::FieldCell<Scal>* p_fc_volume_source_;
   geom::FieldCell<Scal>* p_fc_mass_source_;
 
@@ -217,6 +219,8 @@ class FluidSolver : public UnsteadyIterativeSolver {
                       geom::FieldCell<Scal>* p_fc_density,
                       geom::FieldCell<Scal>* p_fc_viscosity,
                       geom::FieldCell<Vect>* p_fc_force,
+                      geom::FieldCell<Vect>* p_fc_stforce,
+                      geom::FieldFace<Vect>* p_ff_stforce,
                       geom::FieldCell<Scal>* p_fc_volume_source,
                       geom::FieldCell<Scal>* p_fc_mass_source,
                       double convergence_tolerance,
@@ -226,6 +230,8 @@ class FluidSolver : public UnsteadyIterativeSolver {
       , p_fc_density_(p_fc_density)
       , p_fc_viscosity_(p_fc_viscosity)
       , p_fc_force_(p_fc_force)
+      , p_fc_stforce_(p_fc_stforce)
+      , p_ff_stforce_(p_ff_stforce)
       , p_fc_volume_source_(p_fc_volume_source)
       , p_fc_mass_source_(p_fc_mass_source)
   {
@@ -636,6 +642,8 @@ class FluidSimple : public FluidSolver<Mesh> {
               geom::FieldCell<Scal>* p_fc_density,
               geom::FieldCell<Scal>* p_fc_viscosity,
               geom::FieldCell<Vect>* p_fc_force,
+              geom::FieldCell<Vect>* p_fc_stforce,
+              geom::FieldFace<Vect>* p_ff_stforce,
               geom::FieldCell<Scal>* p_fc_volume_source,
               geom::FieldCell<Scal>* p_fc_mass_source,
               double time, double time_step,
@@ -649,7 +657,8 @@ class FluidSimple : public FluidSolver<Mesh> {
               bool force_geometric_average,
               Scal guess_extrapolation = 0.)
       : FluidSolver<Mesh>(time, time_step, p_fc_density, p_fc_viscosity,
-                    p_fc_force, p_fc_volume_source, p_fc_mass_source,
+                    p_fc_force, p_fc_stforce, p_ff_stforce,
+                    p_fc_volume_source, p_fc_mass_source,
                     convergence_tolerance, num_iterations_limit)
       , mesh(mesh)
       , fc_force_(mesh)
