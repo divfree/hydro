@@ -4,6 +4,12 @@
 
 #pragma once
 
+#include <memory>
+
+#ifdef MPI_ENABLE
+#include <mpi.h>
+#endif
+
 #include "../control/experiment.hpp"
 #include "../common/vect.hpp"
 #include "mesh.hpp"
@@ -14,13 +20,9 @@
 #include "output_paraview.hpp"
 #include "heat.hpp"
 #include "advection.hpp"
-#include <memory>
 #include "fluid.hpp"
 #include "chemistry.hpp"
 
-#ifdef MPI_ENABLE
-#include <mpi.h>
-#endif
 
 
 // TODO: Change parameters on events (e.g. certain time moments)

@@ -13,6 +13,7 @@
 #include "mesh.hpp"
 #include <cassert>
 #include <fstream>
+#include <functional>
 
 namespace output {
 
