@@ -1186,15 +1186,18 @@ void hydro<Mesh>::CalcForce() {
   }
 
   // surface tension
-  fc_stforce.Reinit(mesh);
-  ff_stforce.Reinit(mesh);
+  fc_stforce.Reinit(mesh, Vect(0));
+  ff_stforce.Reinit(mesh, Vect(0));
   if (num_phases >= 2) {
     auto a = v_fc_volume_fraction[1];
-    a = solver::GetSmoothField(a, mesh, 1);
+    //auto as = solver::GetSmoothField(a, mesh, 1);
+    auto as = a;
 
     auto& cond = v_mf_partial_density_cond_[0];
     auto af = solver::Interpolate(a, cond, mesh);
     auto gc = solver::Gradient(af, mesh);
+    auto asf = solver::Interpolate(as, cond, mesh);
+    auto gsc = solver::Gradient(asf, mesh);
     // zero-derivative bc for Vect
     geom::MapFace<std::shared_ptr<solver::ConditionFace>> mfvz;
     for (auto idxface : mesh.Faces()) {
@@ -1206,21 +1209,34 @@ void hydro<Mesh>::CalcForce() {
     // surface tension on faces
     auto sigma = P_double["sigma"];
     auto gf = solver::Interpolate(gc, mfvz, mesh);
+    auto gsf = solver::Interpolate(gsc, mfvz, mesh);
+    /*
     for (auto idxface : mesh.Faces()) {
       auto g = gf[idxface];
       auto n = gf[idxface];
       n /= (n.norm() + 1e-6); 
       ff_stforce[idxface] = 
+          //g * (mesh.GetSurface(idxface).dot(n) * sigma);
           g * (mesh.GetSurface(idxface).dot(n) * sigma);
     }
+    */
     for (auto idxcell : mesh.Cells()) {
       Vect f(0);
+      Scal k = 0.;
       for (size_t i = 0; i < mesh.GetNumNeighbourFaces(idxcell); ++i) {
         IdxFace idxface = mesh.GetNeighbourFace(idxcell, i);
-        f += ff_stforce[idxface] * mesh.GetOutwardFactor(idxcell, i);
+        //auto g = gsf[idxface];
+        auto n = gsf[idxface];
+        n /= (n.norm() + 1e-6); 
+        k += n.dot(mesh.GetOutwardSurface(idxcell, i));
+        //f += ff_stforce[idxface] * mesh.GetOutwardFactor(idxcell, i);
       }
-      f /= mesh.GetVolume(idxcell);
-      fc_stforce[idxcell] = f;
+      //f /= mesh.GetVolume(idxcell);
+      k /= -mesh.GetVolume(idxcell);
+      //k = 1./0.125;
+      f = gc[idxcell] * (-k * sigma);
+      //fc_stforce[idxcell] = f;
+      fc_force[idxcell] += f;
     }
   }
 

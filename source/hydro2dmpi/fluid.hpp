@@ -898,12 +898,12 @@ class FluidSimple : public FluidSolver<Mesh> {
         Vect dp = mesh.GetVectToCell(idxface, 1);
         const auto pressure_surface_derivative_wide =
             (ff_pressure_grad_[idxface] -
-            ff_stforce_restored_[idxface] -
+            //ff_stforce_restored_[idxface] -
             ff_ext_force_restored_[idxface]).dot(mesh.GetSurface(idxface));
         const auto pressure_surface_derivative_compact =
             (fc_pressure_prev[cp] - fc_pressure_prev[cm]) /
             (dp - dm).norm() * mesh.GetArea(idxface) -
-            (*this->p_ff_stforce_)[idxface].dot(mesh.GetNormal(idxface)) - 
+            //(*this->p_ff_stforce_)[idxface].dot(mesh.GetNormal(idxface)) - 
             ff_ext_force_[idxface].dot(mesh.GetSurface(idxface));
         //const auto mmim = (1. - velocity_relaxation_factor_) *
         //    (ff_vol_flux_.iter_prev[idxface] -
