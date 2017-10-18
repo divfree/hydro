@@ -15,3 +15,6 @@ rm -f hydro3.pid
 rm -f tp1*
 rm -f *.vts
 rm -f *.pvd
+rm -f nohup.out
+rm -f exp.log
+rm -f exp.scalar.dat

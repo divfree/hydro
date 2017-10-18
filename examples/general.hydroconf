@@ -170,6 +170,7 @@ set bool output_target_density_0 0
 set bool output_target_density_1 0
 set bool output_target_density_2 0
 set bool output_volume_source 0
+set bool output_curvature 0
 set bool output_excluded 0
 
 # iterations history
