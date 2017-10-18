@@ -171,3 +171,5 @@ if (MPI_ENABLE)
 endif()
 
 target_link_libraries(${BINARY_NAME} ${LIBRARIES})
+
+install(TARGETS ${BINARY_NAME} RUNTIME DESTINATION $ENV{HOME}/bin)
