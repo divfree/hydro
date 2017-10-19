@@ -1233,7 +1233,7 @@ void hydro<Mesh>::CalcForce() {
       }
       //f /= mesh.GetVolume(idxcell);
       k /= -mesh.GetVolume(idxcell);
-      //k = 1./0.125;
+      k = 1./0.125;
       f = gc[idxcell] * (-k * sigma);
       fc_stforce[idxcell] = f;
       //fc_force[idxcell] += f;
