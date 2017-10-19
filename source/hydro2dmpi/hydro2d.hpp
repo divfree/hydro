@@ -1190,8 +1190,8 @@ void hydro<Mesh>::CalcForce() {
   ff_stforce.Reinit(mesh, Vect(0));
   if (num_phases >= 2) {
     auto a = v_fc_volume_fraction[1];
-    //auto as = solver::GetSmoothField(a, mesh, 1);
-    auto as = a;
+    auto as = solver::GetSmoothField(a, mesh, 1);
+    //auto as = a;
 
     auto& cond = v_mf_partial_density_cond_[0];
     auto af = solver::Interpolate(a, cond, mesh);
