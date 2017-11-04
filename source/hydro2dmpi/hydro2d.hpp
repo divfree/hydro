@@ -1222,20 +1222,20 @@ void hydro<Mesh>::CalcForce() {
     */
     for (auto idxcell : mesh.Cells()) {
       Vect f(0);
-      Scal k = 0.;
+      //Scal k = 0.;
       for (size_t i = 0; i < mesh.GetNumNeighbourFaces(idxcell); ++i) {
         IdxFace idxface = mesh.GetNeighbourFace(idxcell, i);
-        //auto g = gsf[idxface];
+        auto g = gsf[idxface];
         auto n = gsf[idxface];
         n /= (n.norm() + 1e-6); 
-        k += n.dot(mesh.GetOutwardSurface(idxcell, i));
-        //f += ff_stforce[idxface] * mesh.GetOutwardFactor(idxcell, i);
+        //k += n.dot(mesh.GetOutwardSurface(idxcell, i));
+        f += g * mesh.GetOutwardSurface(idxcell, i).dot(n);
       }
-      //f /= mesh.GetVolume(idxcell);
-      k /= -mesh.GetVolume(idxcell);
-      k = 1./0.125;
-      f = gc[idxcell] * (-k * sigma);
-      fc_stforce[idxcell] = f;
+      f /= mesh.GetVolume(idxcell);
+      //k /= -mesh.GetVolume(idxcell);
+      //k = 1./0.125;
+      //f = gc[idxcell] * (-k * sigma);
+      fc_stforce[idxcell] = f * sigma;
       //fc_force[idxcell] += f;
     }
   }
