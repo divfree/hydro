@@ -1229,7 +1229,9 @@ void hydro<Mesh>::CalcForce() {
         auto n = gsf[idxface];
         n /= (n.norm() + 1e-6); 
         //k += n.dot(mesh.GetOutwardSurface(idxcell, i));
-        f += g * mesh.GetOutwardSurface(idxcell, i).dot(n);
+        auto s = mesh.GetOutwardSurface(idxcell, i);
+        f += g * s.dot(n);
+        f -= s * g.norm();
       }
       f /= mesh.GetVolume(idxcell);
       //k /= -mesh.GetVolume(idxcell);
