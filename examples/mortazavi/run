@@ -6,5 +6,5 @@ if [[ -f hydro3.lock ]] ; then
 fi
 export OMP_NUM_THREADS=4
 
-nohup hydro start.hydroconf &
+nohup nice -n 19 hydro start.hydroconf &
 echo $! > hydro3.pid
