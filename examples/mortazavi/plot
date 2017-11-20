@@ -14,7 +14,7 @@ hr2x,hr2u = np.loadtxt(pr + 'xu').T
 lbr = "Mortazavi"
 
 
-for n in range(len(ds['x']))[::5]:
+for n in range(len(ds['x']))[::10]:
     fo = "contour_{:04d}.png".format(n)
     mp.plot_contour(ds['x'][n], ds['y'][n], 
         np.clip(ds['f'][n], 0., 1.), fo=fo, fill=True)
