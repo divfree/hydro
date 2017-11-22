@@ -380,7 +380,8 @@ void hydro<Mesh>::InitFluidSolver() {
     0., dt, *p_linear_factory_velocity, *p_linear_factory_pressure,
     P_double["convergence_tolerance"], P_int["num_iterations_limit"],
     &ex->timer_, P_bool["time_second_order"], P_bool["simpler"],
-    P_bool["force_geometric_average"], P_double["guess_extrapolation"]);
+    P_bool["force_geometric_average"], P_double["guess_extrapolation"],
+    GetVect<Vect>(P_vect["meshvel"]));
 
   /*fluid_solver = std::make_shared<solver::FluidSimpleParallel<Mesh>>(
       mesh, fc_velocity_initial, fluid_cond, mc_cond_fluid,

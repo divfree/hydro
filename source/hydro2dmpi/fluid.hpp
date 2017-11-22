@@ -101,16 +101,16 @@ class ConvectionDiffusionImplicit : public ConvectionDiffusion<Mesh> {
       geom::FieldCell<Scal>* p_fc_density,
       geom::FieldFace<Scal>* p_ff_kinematic_viscosity,
       geom::FieldCell<Vect>* p_fc_force,
-      geom::FieldFace<Scal>* p_ff_vol_flux,
-      double time, double time_step,
-      const LinearSolverFactory& linear_factory,
-      double convergence_tolerance,
-      size_t num_iterations_limit,
-      bool time_second_order = true,
-      Scal guess_extrapolation = 0.)
-      : ConvectionDiffusion<Mesh>(
-          time, time_step, p_fc_density, p_ff_kinematic_viscosity, p_fc_force,
-          p_ff_vol_flux,
+    geom::FieldFace<Scal>* p_ff_vol_flux,
+    double time, double time_step,
+    const LinearSolverFactory& linear_factory,
+    double convergence_tolerance,
+    size_t num_iterations_limit,
+    bool time_second_order = true,
+    Scal guess_extrapolation = 0.)
+    : ConvectionDiffusion<Mesh>(
+        time, time_step, p_fc_density, p_ff_kinematic_viscosity, p_fc_force,
+        p_ff_vol_flux,
           convergence_tolerance, num_iterations_limit)
       , mesh(mesh)
       , mf_velocity_cond_(mf_velocity_cond)
@@ -482,6 +482,7 @@ class FluidSimple : public FluidSolver<Mesh> {
   bool simpler_;
   bool force_geometric_average_;
   Scal guess_extrapolation_;
+  Vect meshvel_;
 
   void UpdateDerivedConditions() {
     using namespace fluid_condition;
@@ -659,7 +660,8 @@ class FluidSimple : public FluidSolver<Mesh> {
               bool time_second_order,
               bool simpler,
               bool force_geometric_average,
-              Scal guess_extrapolation = 0.)
+              Scal guess_extrapolation = 0.,
+              Vect meshvel=0)
       : FluidSolver<Mesh>(time, time_step, p_fc_density, p_fc_viscosity,
                     p_fc_force, p_fc_stforce, p_ff_stforce,
                     p_fc_volume_source, p_fc_mass_source,
@@ -678,6 +680,7 @@ class FluidSimple : public FluidSolver<Mesh> {
       , simpler_(simpler)
       , force_geometric_average_(force_geometric_average)
       , guess_extrapolation_(guess_extrapolation)
+      , meshvel_(meshvel)
   {
     linear_ = linear_factory_pressure.Create<Scal, IdxCell, Expr>();
 
