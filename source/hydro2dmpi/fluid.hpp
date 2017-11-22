@@ -774,6 +774,11 @@ class FluidSimple : public FluidSolver<Mesh> {
       ff_vol_flux_.time_curr[idxface] =
           ff_velocity_asterisk_[idxface].dot(mesh.GetSurface(idxface));
     }
+    // Apply meshvel
+    for (auto idxface : mesh.Faces()) {
+      ff_vol_flux_.time_curr[idxface] -= 
+          this->meshvel_.dot(mesh.GetSurface(idxface));
+    }
 
     ff_vol_flux_.time_prev = ff_vol_flux_.time_curr;
     ff_volume_flux_interpolated_.Reinit(mesh, 0.);
