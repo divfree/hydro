@@ -209,6 +209,8 @@ class FluidSolver : public UnsteadyIterativeSolver {
   geom::FieldCell<Scal>* p_fc_density_;
   geom::FieldCell<Scal>* p_fc_viscosity_;
   geom::FieldCell<Vect>* p_fc_force_;
+  geom::FieldCell<Vect>* p_fc_stforce_;
+  geom::FieldFace<Vect>* p_ff_stforce_;
   geom::FieldCell<Scal>* p_fc_volume_source_;
   geom::FieldCell<Scal>* p_fc_mass_source_;
 
@@ -217,6 +219,8 @@ class FluidSolver : public UnsteadyIterativeSolver {
                       geom::FieldCell<Scal>* p_fc_density,
                       geom::FieldCell<Scal>* p_fc_viscosity,
                       geom::FieldCell<Vect>* p_fc_force,
+                      geom::FieldCell<Vect>* p_fc_stforce,
+                      geom::FieldFace<Vect>* p_ff_stforce,
                       geom::FieldCell<Scal>* p_fc_volume_source,
                       geom::FieldCell<Scal>* p_fc_mass_source,
                       double convergence_tolerance,
@@ -226,6 +230,8 @@ class FluidSolver : public UnsteadyIterativeSolver {
       , p_fc_density_(p_fc_density)
       , p_fc_viscosity_(p_fc_viscosity)
       , p_fc_force_(p_fc_force)
+      , p_fc_stforce_(p_fc_stforce)
+      , p_ff_stforce_(p_ff_stforce)
       , p_fc_volume_source_(p_fc_volume_source)
       , p_fc_mass_source_(p_fc_mass_source)
   {
@@ -467,6 +473,7 @@ class FluidSimple : public FluidSolver<Mesh> {
   geom::FieldFace<Vect> ff_ext_force_;
   geom::FieldCell<Vect> fc_ext_force_restored_;
   geom::FieldFace<Vect> ff_ext_force_restored_;
+  geom::FieldFace<Vect> ff_stforce_restored_;
   // / needed for MMIM, now disabled
   //geom::FieldFace<Vect> ff_velocity_iter_prev_;
 
@@ -591,6 +598,9 @@ class FluidSimple : public FluidSolver<Mesh> {
     ff_ext_force_ = Interpolate(
         *this->p_fc_force_, mf_force_cond_, mesh,
         force_geometric_average_);
+    ff_stforce_restored_ = Interpolate(
+        *this->p_fc_stforce_, mf_force_cond_, mesh,
+        force_geometric_average_);
     fc_ext_force_restored_.Reinit(mesh);
 
 #pragma omp parallel for
@@ -636,6 +646,8 @@ class FluidSimple : public FluidSolver<Mesh> {
               geom::FieldCell<Scal>* p_fc_density,
               geom::FieldCell<Scal>* p_fc_viscosity,
               geom::FieldCell<Vect>* p_fc_force,
+              geom::FieldCell<Vect>* p_fc_stforce,
+              geom::FieldFace<Vect>* p_ff_stforce,
               geom::FieldCell<Scal>* p_fc_volume_source,
               geom::FieldCell<Scal>* p_fc_mass_source,
               double time, double time_step,
@@ -649,7 +661,8 @@ class FluidSimple : public FluidSolver<Mesh> {
               bool force_geometric_average,
               Scal guess_extrapolation = 0.)
       : FluidSolver<Mesh>(time, time_step, p_fc_density, p_fc_viscosity,
-                    p_fc_force, p_fc_volume_source, p_fc_mass_source,
+                    p_fc_force, p_fc_stforce, p_ff_stforce,
+                    p_fc_volume_source, p_fc_mass_source,
                     convergence_tolerance, num_iterations_limit)
       , mesh(mesh)
       , fc_force_(mesh)
@@ -834,6 +847,7 @@ class FluidSimple : public FluidSolver<Mesh> {
       fc_force_[idxcell] +=
           fc_pressure_grad_[idxcell] * (-1.) +
           fc_ext_force_restored_[idxcell] +
+          (*this->p_fc_stforce_)[idxcell] +
           // Volume source momentum compensation:
           conv_diff_solver_->GetVelocity(Layers::iter_curr)[idxcell] *
           ((*this->p_fc_density_)[idxcell] *
@@ -884,11 +898,12 @@ class FluidSimple : public FluidSolver<Mesh> {
         Vect dp = mesh.GetVectToCell(idxface, 1);
         const auto pressure_surface_derivative_wide =
             (ff_pressure_grad_[idxface] -
+            //ff_stforce_restored_[idxface] -
             ff_ext_force_restored_[idxface]).dot(mesh.GetSurface(idxface));
         const auto pressure_surface_derivative_compact =
             (fc_pressure_prev[cp] - fc_pressure_prev[cm]) /
-            (dp - dm).norm() *
-            mesh.GetArea(idxface) -
+            (dp - dm).norm() * mesh.GetArea(idxface) -
+            //(*this->p_ff_stforce_)[idxface].dot(mesh.GetNormal(idxface)) - 
             ff_ext_force_[idxface].dot(mesh.GetSurface(idxface));
         //const auto mmim = (1. - velocity_relaxation_factor_) *
         //    (ff_vol_flux_.iter_prev[idxface] -

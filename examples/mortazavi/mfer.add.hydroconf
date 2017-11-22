@@ -1,6 +1,20 @@
-set double T 2
+set double T 40
 set int max_frame_index $(T)0
 
 set int Nx 64
 set int Ny 64
-set double dt 0.01
+
+set double dt 0.005
+
+set int num_iterations_limit 5
+
+set double rhie_chow_factor 0.1
+
+set double advection_dt_factor 1.
+
+set double sharp 0.3
+
+set vect pressure_fixed_point (0, 0, 0)
+set double pressure_fixed_value 0
+
+set double guess_extrapolation 1

@@ -14,10 +14,6 @@ hr2x,hr2u = np.loadtxt(pr + 'xu').T
 lbr = "Mortazavi"
 
 
-for n in range(len(ds['x']))[::5]:
-    fo = "contour_{:04d}.png".format(n)
-    mp.plot_contour(ds['x'][n], ds['y'][n], 
-        np.clip(ds['f'][n], 0., 1.), fo=fo, fill=True)
 
 # plot lines
 xs0 = hs['x'] - hs['x'][0]
@@ -45,3 +41,28 @@ sel = np.where(xs > xs.max() - 2. * lx)[0]
 n = sel[np.argmin(np.abs((xs[sel]) % lx - xr))]
 mp.plot_stream(ds['x'][n], ds['y'][n], 
         ds['u'][n], ds['v'][n], ds['f'][n], bg=pr + "s.png")
+
+# plot contour
+skip=10
+for n in range(len(ds['x']))[::skip]:
+    fo = "contour_{:04d}.png".format(n)
+    mp.plot_contour(ds['x'][n], ds['y'][n], 
+        np.clip(ds['f'][n], 0., 1.), fo=fo, fill=True)
+
+for n in range(len(ds['x']))[::skip]:
+    fo = "contour_p_{:04d}.png".format(n)
+    mp.plot_contour(ds['x'][n], ds['y'][n], 
+        ds['p'][n], fo=fo, fill=True)
+
+for n in range(len(ds['x']))[::skip]:
+    u = ds['u'][n]
+    v = ds['v'][n]
+    u0 = np.average(u, weights=ds['f'][n])
+    v0 = np.average(v, weights=ds['f'][n])
+    u -= u0
+    v -= v0
+    m = (u ** 2 + v ** 2) ** 0.5
+    fo = "contour_u_{:04d}.png".format(n)
+    mp.plot_contour(ds['x'][n], ds['y'][n], 
+        #np.clip(ds['f'][n], 0., 1.), fo=fo, fill=True)
+        m, fo=fo, fill=True)

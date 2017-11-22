@@ -95,9 +95,10 @@ class hydro : public TModule
 
   std::vector<const FieldFace<Scal>*> v_p_ff_volume_flux_slip;
   FieldCell<Vect> fc_force;
+  FieldCell<Vect> fc_stforce; // surface tension: force
+  FieldFace<Vect> ff_stforce; // force * area
   FieldCell<Scal> fc_c1_smooth, fc_c1_laplacian;
   FieldCell<Scal> fc_radiation;
-  FieldCell<Scal> fc_curv_;
   geom::MapFace<std::shared_ptr<solver::ConditionFace>> mf_cond_radiation_shared;
   std::vector<geom::MapFace<std::shared_ptr<solver::ConditionFace>>>
   v_mf_partial_density_cond_;
@@ -371,7 +372,10 @@ void hydro<Mesh>::InitFluidSolver() {
     P_double["velocity_relaxation_factor"],
     P_double["pressure_relaxation_factor"],
     P_double["rhie_chow_factor"],
-    &fc_density_smooth, &fc_viscosity_smooth, &fc_force,
+    &fc_density_smooth, &fc_viscosity_smooth, 
+    &fc_force, 
+    &fc_stforce, 
+    &ff_stforce,
     &fc_volume_source, &fc_mass_source,
     0., dt, *p_linear_factory_velocity, *p_linear_factory_pressure,
     P_double["convergence_tolerance"], P_int["num_iterations_limit"],
@@ -641,9 +645,6 @@ void hydro<Mesh>::InitOutput() {
       , std::make_shared<output::EntryFunction<Scal, IdxCell, Mesh>>(
           "excluded", outmesh, [this](IdxCell idx) {
               return mesh.IsExcluded(out_to_mesh_[idx]) ? 1. : 0.; })
-      , std::make_shared<output::EntryFunction<Scal, IdxCell, Mesh>>(
-          "curvature", outmesh, [this](IdxCell idx) {
-              return fc_curv_[out_to_mesh_[idx]]; })
       , std::make_shared<output::EntryFunction<Scal, IdxCell, Mesh>>(
           "divergence", outmesh, [this](IdxCell idx) {
               auto idxcell = out_to_mesh_[idx];
@@ -1185,13 +1186,18 @@ void hydro<Mesh>::CalcForce() {
   }
 
   // surface tension
+  fc_stforce.Reinit(mesh, Vect(0));
+  ff_stforce.Reinit(mesh, Vect(0));
   if (num_phases >= 2) {
     auto a = v_fc_volume_fraction[1];
-    a = solver::GetSmoothField(a, mesh, 1);
+    //auto as = solver::GetSmoothField(a, mesh, 1);
+    auto as = a;
 
     auto& cond = v_mf_partial_density_cond_[0];
     auto af = solver::Interpolate(a, cond, mesh);
     auto gc = solver::Gradient(af, mesh);
+    auto asf = solver::Interpolate(as, cond, mesh);
+    auto gsc = solver::Gradient(asf, mesh);
     // zero-derivative bc for Vect
     geom::MapFace<std::shared_ptr<solver::ConditionFace>> mfvz;
     for (auto idxface : mesh.Faces()) {
@@ -1200,20 +1206,39 @@ void hydro<Mesh>::CalcForce() {
             std::make_shared<solver::ConditionFaceDerivativeFixed<Vect>>(Vect(0));
       }
     }
-    auto gf = solver::Interpolate(gc, mfvz, mesh);
-    fc_curv_.Reinit(mesh, 0.);
+    // surface tension on faces
     auto sigma = P_double["sigma"];
+    auto gf = solver::Interpolate(gc, mfvz, mesh);
+    auto gsf = solver::Interpolate(gsc, mfvz, mesh);
+    /*
+    for (auto idxface : mesh.Faces()) {
+      auto g = gf[idxface];
+      auto n = gf[idxface];
+      n /= (n.norm() + 1e-6); 
+      ff_stforce[idxface] = 
+          //g * (mesh.GetSurface(idxface).dot(n) * sigma);
+          g * (mesh.GetSurface(idxface).dot(n) * sigma);
+    }
+    */
     for (auto idxcell : mesh.Cells()) {
       Vect f(0);
+      //Scal k = 0.;
       for (size_t i = 0; i < mesh.GetNumNeighbourFaces(idxcell); ++i) {
         IdxFace idxface = mesh.GetNeighbourFace(idxcell, i);
-        auto g = gf[idxface];
-        auto n = gf[idxface];
+        auto g = gsf[idxface];
+        auto n = gsf[idxface];
         n /= (n.norm() + 1e-6); 
-        f += g * mesh.GetOutwardSurface(idxcell, i).dot(n);
+        //k += n.dot(mesh.GetOutwardSurface(idxcell, i));
+        auto s = mesh.GetOutwardSurface(idxcell, i);
+        f += g * s.dot(n);
+        f -= s * g.norm();
       }
       f /= mesh.GetVolume(idxcell);
-      fc_force[idxcell] += f * sigma;
+      //k /= -mesh.GetVolume(idxcell);
+      //k = 1./0.125;
+      //f = gc[idxcell] * (-k * sigma);
+      fc_stforce[idxcell] = f * sigma;
+      //fc_force[idxcell] += f;
     }
   }
 
