@@ -759,6 +759,7 @@ void hydro<Mesh>::InitOutput() {
   }
 
   // min/max scalar output
+  // pd -- partial density
   for (auto i : phases) {
     std::string phase = IntToStr(i);
     content_scalar.push_back(P("pd_min_" + phase,
@@ -766,6 +767,27 @@ void hydro<Mesh>::InitOutput() {
     content_scalar.push_back(P("pd_max_" + phase,
                                "stat_pd_max_" + phase));
   }
+
+  // volumetric center
+  for (auto i : phases) {
+    std::string phase = IntToStr(i);
+    content_scalar.push_back(P("cx_" + phase, "stat_cx_" + phase));
+    if (dim > 1) {
+      content_scalar.push_back(P("cy_" + phase, "stat_cy_" + phase));
+    }
+    if (dim > 2) {
+      content_scalar.push_back(P("cz_" + phase, "stat_cz_" + phase));
+    }
+
+    content_scalar.push_back(P("vx_" + phase, "stat_vx_" + phase));
+    if (dim > 1) {
+      content_scalar.push_back(P("vy_" + phase, "stat_vy_" + phase));
+    }
+    if (dim > 2) {
+      content_scalar.push_back(P("vz_" + phase, "stat_vz_" + phase));
+    }
+  }
+
 
   if (!P_string.exist(_plt_title)) {
     P_string.set(_plt_title, P_string[_exp_name]);
@@ -1307,18 +1329,34 @@ void hydro<Mesh>::CalcStat() {
     Scal volume = 0.;
     Scal pd_min = 1e10;
     Scal pd_max = -1e10;
+    Vect center(0);
+    Vect vel(0);
     for (auto idxcell : mesh.Cells()) {
       Scal c = v_fc_volume_fraction[i][idxcell];
       volume += c * mesh.GetVolume(idxcell);
       auto pd = advection_solver->GetField(i)[idxcell];
       pd_min = std::min(pd_min, pd);
       pd_max = std::max(pd_max, pd);
+      center += mesh.GetCenter(idxcell) * (c * mesh.GetVolume(idxcell));
+      vel += fluid_solver->GetVelocity()[idxcell] * (c * mesh.GetVolume(idxcell));
     }
     Scal mass = volume * density;
+    center /= volume;
+    vel /= volume;
     P_double.set("stat_volume_" + IntToStr(i), volume);
     P_double.set("stat_mass_" + IntToStr(i), mass);
     P_double.set("stat_pd_min_" + IntToStr(i), pd_min);
     P_double.set("stat_pd_max_" + IntToStr(i), pd_max);
+    P_double.set("stat_cx_" + IntToStr(i), center[0]);
+    P_double.set("stat_vx_" + IntToStr(i), vel[0]);
+    if (dim > 1) {
+      P_double.set("stat_cy_" + IntToStr(i), center[1]);
+      P_double.set("stat_vy_" + IntToStr(i), vel[1]);
+    }
+    if (dim > 2) {
+      P_double.set("stat_cz_" + IntToStr(i), center[2]);
+      P_double.set("stat_vz_" + IntToStr(i), vel[2]);
+    }
 
     Scal volume_flux_in = 0.;
     Scal volume_flux_out = 0.;
