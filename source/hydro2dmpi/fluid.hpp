@@ -922,6 +922,12 @@ class FluidSimple : public FluidSolver<Mesh> {
       }
     }
 
+    // Apply meshvel
+    for (auto idxface : mesh.Faces()) {
+      ff_volume_flux_asterisk_[idxface] -= 
+          meshvel_.dot(mesh.GetSurface(idxface));
+    }
+
     timer_->Pop();
 
     // TODO: Rename SurfaceVelocity to MassFlux or VolumeFlux
@@ -929,6 +935,7 @@ class FluidSimple : public FluidSolver<Mesh> {
     timer_->Push("fluid.4.volume-flux");
     // TODO: Rename velocity_corr to smth
     // (it's actually full velocity not just correction)
+    // (same for ff_volume_flux_corr_)
 #pragma omp parallel for
     for (IntIdx i = 0; i < static_cast<IntIdx>(mesh.Faces().size()); ++i) {
       IdxFace idxface(i);
