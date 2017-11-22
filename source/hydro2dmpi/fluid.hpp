@@ -213,6 +213,7 @@ class FluidSolver : public UnsteadyIterativeSolver {
   geom::FieldFace<Vect>* p_ff_stforce_;
   geom::FieldCell<Scal>* p_fc_volume_source_;
   geom::FieldCell<Scal>* p_fc_mass_source_;
+  Vect meshvel_;
 
  public:
   FluidSolver(double time, double time_step,
@@ -224,7 +225,8 @@ class FluidSolver : public UnsteadyIterativeSolver {
                       geom::FieldCell<Scal>* p_fc_volume_source,
                       geom::FieldCell<Scal>* p_fc_mass_source,
                       double convergence_tolerance,
-                      size_t num_iterations_limit)
+                      size_t num_iterations_limit,
+                      Vect meshvel)
       : UnsteadyIterativeSolver(time, time_step,
                                 convergence_tolerance, num_iterations_limit)
       , p_fc_density_(p_fc_density)
@@ -234,6 +236,7 @@ class FluidSolver : public UnsteadyIterativeSolver {
       , p_ff_stforce_(p_ff_stforce)
       , p_fc_volume_source_(p_fc_volume_source)
       , p_fc_mass_source_(p_fc_mass_source)
+      , meshvel_(meshvel)
   {
 
   }
@@ -243,6 +246,7 @@ class FluidSolver : public UnsteadyIterativeSolver {
   virtual const geom::FieldCell<Scal>& GetPressure(Layers layer) = 0;
   virtual const geom::FieldFace<Scal>& GetVolumeFlux() = 0;
   virtual const geom::FieldFace<Scal>& GetVolumeFlux(Layers layer) = 0;
+  virtual void SetMeshVel(Vect meshvel) { meshvel_ = meshvel; }
 };
 
 class ConditionFaceFluid : public ConditionFace {};
@@ -482,7 +486,6 @@ class FluidSimple : public FluidSolver<Mesh> {
   bool simpler_;
   bool force_geometric_average_;
   Scal guess_extrapolation_;
-  Vect meshvel_;
 
   void UpdateDerivedConditions() {
     using namespace fluid_condition;
@@ -665,7 +668,7 @@ class FluidSimple : public FluidSolver<Mesh> {
       : FluidSolver<Mesh>(time, time_step, p_fc_density, p_fc_viscosity,
                     p_fc_force, p_fc_stforce, p_ff_stforce,
                     p_fc_volume_source, p_fc_mass_source,
-                    convergence_tolerance, num_iterations_limit)
+                    convergence_tolerance, num_iterations_limit, meshvel)
       , mesh(mesh)
       , fc_force_(mesh)
       , velocity_relaxation_factor_(velocity_relaxation_factor)
@@ -680,7 +683,6 @@ class FluidSimple : public FluidSolver<Mesh> {
       , simpler_(simpler)
       , force_geometric_average_(force_geometric_average)
       , guess_extrapolation_(guess_extrapolation)
-      , meshvel_(meshvel)
   {
     linear_ = linear_factory_pressure.Create<Scal, IdxCell, Expr>();
 
@@ -925,7 +927,7 @@ class FluidSimple : public FluidSolver<Mesh> {
     // Apply meshvel
     for (auto idxface : mesh.Faces()) {
       ff_volume_flux_asterisk_[idxface] -= 
-          meshvel_.dot(mesh.GetSurface(idxface));
+          this->meshvel_.dot(mesh.GetSurface(idxface));
     }
 
     timer_->Pop();

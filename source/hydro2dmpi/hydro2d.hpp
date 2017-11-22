@@ -1397,6 +1397,13 @@ void hydro<Mesh>::CalcStat() {
     increase("stat_volume_out_" + phase, volume_flux_out);
     increase("stat_mass_in_" + phase, mass_flux_in);
     increase("stat_mass_out_" + phase, mass_flux_out);
+
+  }
+  // ADHOC: set meshvel to vx of phase 1
+  if (flag("meshvel_auto")) {
+    Vect v(0);
+    v[0] = P_double["stat_vx_1"];
+    fluid_solver->SetMeshVel(v);
   }
 }
 
