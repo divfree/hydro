@@ -247,6 +247,7 @@ class FluidSolver : public UnsteadyIterativeSolver {
   virtual const geom::FieldFace<Scal>& GetVolumeFlux() = 0;
   virtual const geom::FieldFace<Scal>& GetVolumeFlux(Layers layer) = 0;
   virtual void SetMeshVel(Vect meshvel) { meshvel_ = meshvel; }
+  virtual double GetAutoTimeStep() { return GetTimeStep(); }
 };
 
 class ConditionFaceFluid : public ConditionFace {};
@@ -1178,6 +1179,22 @@ class FluidSimple : public FluidSolver<Mesh> {
   }
   const geom::FieldFace<Scal>& GetVolumeFlux(Layers layer) override {
     return ff_vol_flux_.Get(layer);
+  }
+  double GetAutoTimeStep() override { 
+    double dt = 1e10;
+    auto& flux = ff_vol_flux_.time_curr;
+    for (auto idxcell : mesh.Cells()) {
+      if (!mesh.IsExcluded(idxcell)) {
+        for (size_t i = 0; i < mesh.GetNumNeighbourFaces(idxcell); ++i) {
+          IdxFace idxface = mesh.GetNeighbourFace(idxcell, i);
+          if (flux[idxface] != 0.) {
+            dt = std::min(dt, 
+                std::abs(mesh.GetVolume(idxcell) / flux[idxface]));
+          }
+        }
+      }
+    }
+    return dt; 
   }
 };
 

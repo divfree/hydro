@@ -12,7 +12,7 @@ set double rhie_chow_factor 0.1
 
 set double advection_dt_factor 1.
 
-set double sharp 0.3
+set double sharp 0.
 
 set vect pressure_fixed_point (0, 0, 0)
 set double pressure_fixed_value 0

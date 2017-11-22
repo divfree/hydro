@@ -112,7 +112,10 @@ void TModule::thread() {
 
 void TModule::write_step_header()
 {
-  ex->logger() << "BEGIN. t=" << tnp << ", n=" << P_int["n"] + 1;
+  ex->logger() << "BEGIN. "
+    << "t=" << tnp 
+    << ", dt=" << dt
+    << ", n=" << P_int["n"] + 1;
 }
 
 void TModule::write_step_footer()

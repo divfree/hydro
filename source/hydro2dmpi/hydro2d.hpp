@@ -1411,6 +1411,14 @@ template <class Mesh>
 void hydro<Mesh>::step() {
   ex->timer_.Push("step");
 
+  // Update time step
+  if (flag("dt_auto")) {
+    double cfl = P_double["cfl"];
+    P_double["dt"] = fluid_solver->GetAutoTimeStep() * cfl;
+    fluid_solver->SetTimeStep(dt);
+    advection_solver->SetTimeStep(dt);
+  }
+
   ex->timer_.Push("step.fluid");
   fluid_solver->StartStep();
 
