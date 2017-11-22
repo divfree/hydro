@@ -107,6 +107,7 @@ class hydro : public TModule
   geom::Rect<Vect> domain;
   geom::MapFace<std::shared_ptr<solver::ConditionFaceFluid>> fluid_cond;
   FieldCell<Scal> fc_conductivity, fc_temperature_source;
+  Vect meshpos;
 
   double last_frame_time_;
   double last_frame_scalar_time_;
@@ -221,6 +222,8 @@ void hydro<Mesh>::InitMesh() {
                             GetVect<Vect>(P_vect["B"]));
 
   geom::InitUniformMesh(mesh, domain, mesh_size);
+
+  meshpos = Vect(0);
 
   P_int.set("cells_number", static_cast<int>(mesh.GetNumCells()));
 }
@@ -609,12 +612,14 @@ void hydro<Mesh>::InitOutput() {
   // TODO: EntryFunctionField
   output::Content content_pool = {
       std::make_shared<output::EntryFunction<Scal, IdxNode, Mesh>>(
-          "x", outmesh, [this](IdxNode idx) { return outmesh.GetNode(idx)[0]; })
+          "x", outmesh, [this](IdxNode idx) { 
+              return (outmesh.GetNode(idx) + meshpos)[0]; })
       , std::make_shared<output::EntryFunction<Scal, IdxNode, Mesh>>(
-          "y", outmesh, [this](IdxNode idx) { return outmesh.GetNode(idx)[1]; })
+          "y", outmesh, [this](IdxNode idx) { 
+              return (outmesh.GetNode(idx) + meshpos)[1]; })
       , std::make_shared<output::EntryFunction<Scal, IdxNode, Mesh>>(
           "z", outmesh, [this](IdxNode idx) {
-              return dim == 2 ? 0. : outmesh.GetNode(idx)[2]; })
+              return dim == 2 ? 0. : (outmesh.GetNode(idx) + meshpos)[2]; })
       , std::make_shared<output::EntryFunction<Scal, IdxCell, Mesh>>(
           "velocity_x", outmesh, [this](IdxCell idx) {
               return fluid_solver->GetVelocity()[out_to_mesh_[idx]][0]; })
@@ -1346,6 +1351,7 @@ void hydro<Mesh>::CalcStat() {
     }
     Scal mass = volume * density;
     center /= volume;
+    center += meshpos;
     vel /= volume;
     P_double.set("stat_volume_" + IntToStr(i), volume);
     P_double.set("stat_mass_" + IntToStr(i), mass);
@@ -1405,6 +1411,9 @@ void hydro<Mesh>::CalcStat() {
     v[0] = P_double["stat_vx_1"];
     fluid_solver->SetMeshVel(v);
   }
+  if (flag("meshvel_output")) {
+    meshpos += fluid_solver->GetMeshVel() * dt;
+  }
 }
 
 template <class Mesh>
@@ -1414,7 +1423,8 @@ void hydro<Mesh>::step() {
   // Update time step
   if (flag("dt_auto")) {
     double cfl = P_double["cfl"];
-    P_double["dt"] = fluid_solver->GetAutoTimeStep() * cfl;
+    dt = fluid_solver->GetAutoTimeStep() * cfl;
+    P_double["dt"] = dt;
     fluid_solver->SetTimeStep(dt);
     advection_solver->SetTimeStep(dt);
   }

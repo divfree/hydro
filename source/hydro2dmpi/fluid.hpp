@@ -246,6 +246,7 @@ class FluidSolver : public UnsteadyIterativeSolver {
   virtual const geom::FieldCell<Scal>& GetPressure(Layers layer) = 0;
   virtual const geom::FieldFace<Scal>& GetVolumeFlux() = 0;
   virtual const geom::FieldFace<Scal>& GetVolumeFlux(Layers layer) = 0;
+  virtual Vect GetMeshVel() { return meshvel_; }
   virtual void SetMeshVel(Vect meshvel) { meshvel_ = meshvel; }
   virtual double GetAutoTimeStep() { return GetTimeStep(); }
 };
