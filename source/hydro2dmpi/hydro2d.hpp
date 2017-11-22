@@ -810,9 +810,12 @@ void hydro<Mesh>::InitOutput() {
         P_string["filename_field"], outmesh);
   }
 
-  session_scalar = std::make_shared<output::SessionTecplotAsciiScalar<Scal>>(
-      content_scalar, P_string[_plt_title],
-      P_string[_plt_title], P_string["filename_scalar"] + ".dat");
+  //session_scalar = std::make_shared<output::SessionTecplotAsciiScalar<Scal>>(
+  //    content_scalar, P_string[_plt_title],
+  //    P_string[_plt_title], P_string["filename_scalar"] + ".dat");
+
+  session_scalar = std::make_shared<output::SessionPlainScalar<Scal>>(
+      content_scalar, P_string["filename_scalar"] + ".dat");
 
   last_frame_time_ = 0;
   last_frame_scalar_time_ = 0;
