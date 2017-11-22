@@ -1423,10 +1423,11 @@ void hydro<Mesh>::step() {
   // Update time step
   if (flag("dt_auto")) {
     double cfl = P_double["cfl"];
-    dt = fluid_solver->GetAutoTimeStep() * cfl;
-    P_double["dt"] = dt;
-    fluid_solver->SetTimeStep(dt);
-    advection_solver->SetTimeStep(dt);
+    double cfla = P_double["cfl_advection"];
+    dt = fluid_solver->GetAutoTimeStep();
+    P_double["dt"] = dt * cfl;
+    fluid_solver->SetTimeStep(dt * cfl);
+    advection_solver->SetTimeStep(dt * cfla);
   }
 
   ex->timer_.Push("step.fluid");

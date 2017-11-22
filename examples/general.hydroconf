@@ -28,6 +28,7 @@ set double T 1
 set double dt 0.01
 set bool dt_auto 0
 set double cfl 0.5
+set double cfl_advection 0.5
 
 # physical parameters
 set int num_phases 1
