@@ -148,6 +148,7 @@ class ConvectionDiffusionImplicit : public ConvectionDiffusion<Mesh> {
   }
   void StartStep() override {
     for (size_t n = 0; n < dim; ++n) {
+      v_solver_[n]->SetTimeStep(this->GetTimeStep());
       v_solver_[n]->StartStep();
     }
     CopyToVector(Layers::iter_curr);
@@ -794,6 +795,7 @@ class FluidSimple : public FluidSolver<Mesh> {
     if (IsNan(fc_pressure_.time_curr)) {
       throw std::string("NaN initial pressure");
     }
+    conv_diff_solver_->SetTimeStep(this->GetTimeStep());
     conv_diff_solver_->StartStep();
     fc_pressure_.iter_curr = fc_pressure_.time_curr;
     ff_vol_flux_.iter_curr = ff_vol_flux_.time_curr;

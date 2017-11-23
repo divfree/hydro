@@ -25,7 +25,7 @@ set int Ny 64
 
 # time
 set double T 40.
-set double dt 0.01
+set double dt 1e-6
 
 # physical parameters
 set int num_phases 2
@@ -46,7 +46,7 @@ set double sharp 0.
 set double convergence_tolerance 1e-4
 set double advection_dt_factor 1.
 set double lu_relaxed_tolerance 1e-5
-set int num_iterations_limit 5
+set int num_iterations_limit 20
 set double rhie_chow_factor 0.1
 set vect pressure_fixed_point (0, 0, 0)
 set double pressure_fixed_value 0
