@@ -1357,7 +1357,11 @@ void hydro<Mesh>::CalcStat() {
     P_double.set("stat_mass_" + IntToStr(i), mass);
     P_double.set("stat_pd_min_" + IntToStr(i), pd_min);
     P_double.set("stat_pd_max_" + IntToStr(i), pd_max);
+    double* ptr = P_double("stat_cx_" + IntToStr(i));
+    double prev_cx = ptr ? *ptr : center[0];
     P_double.set("stat_cx_" + IntToStr(i), center[0]);
+    double vcx = (center[0] - prev_cx) / dt;
+    P_double.set("stat_vcx_" + IntToStr(i), vcx);
     P_double.set("stat_vx_" + IntToStr(i), vel[0]);
     if (dim > 1) {
       P_double.set("stat_cy_" + IntToStr(i), center[1]);
@@ -1406,10 +1410,20 @@ void hydro<Mesh>::CalcStat() {
 
   }
   // ADHOC: set meshvel to vx of phase 1
-  if (flag("meshvel_auto")) {
+  if (std::string* s = P_string("meshvel_auto")) {
     Vect v(0);
-    v[0] = P_double["stat_vx_1"];
-    fluid_solver->SetMeshVel(v);
+    if (*s == "vx") {
+      v[0] = P_double["stat_vx_1"];
+    } else if (*s == "vcx") {
+      v[0] = P_double["stat_vcx_1"];
+    } else {
+      logger() << "Unknown meshvel_auto=" << (*s);
+      assert(false); 
+    }
+    std::cout << "meshvel = " << v[0] << std::endl;
+    double w = P_double["meshvel_weight"];
+    Vect cur = fluid_solver->GetMeshVel();
+    fluid_solver->SetMeshVel(v * w + cur * (1.-w));
   }
   if (flag("meshvel_output")) {
     meshpos += fluid_solver->GetMeshVel() * dt;
@@ -1424,10 +1438,11 @@ void hydro<Mesh>::step() {
   if (flag("dt_auto")) {
     double cfl = P_double["cfl"];
     double cfla = P_double["cfl_advection"];
-    dt = fluid_solver->GetAutoTimeStep();
-    P_double["dt"] = dt * cfl;
-    fluid_solver->SetTimeStep(dt * cfl);
-    advection_solver->SetTimeStep(dt * cfla);
+    double dtm = fluid_solver->GetAutoTimeStep();
+    dt = dtm * cfl;
+    P_double["dt"] = dt;
+    fluid_solver->SetTimeStep(dt);
+    advection_solver->SetTimeStep(dtm * cfla);
   }
 
   ex->timer_.Push("step.fluid");
