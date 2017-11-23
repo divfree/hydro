@@ -122,8 +122,9 @@ set double guess_extrapolation 0
 #set double antidiffusion_factor 0
 set bool compressible_enable 0
 set vect meshvel (0,0,0)
-set bool meshvel_auto 0
+#set string meshvel_auto vcx
 set bool meshvel_output 1
+set double meshvel_weight 0.5
 
 # particles
 set double spawning_gap 0.25

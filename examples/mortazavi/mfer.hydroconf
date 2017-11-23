@@ -42,9 +42,17 @@ set int initial_volume_fraction_smooth_times 0
 set int density_smooth_times 0
 set int viscosity_smooth_times 0
 set bool simpler 0
-set double sharp 0.3
+set double sharp 0.
 set double convergence_tolerance 1e-4
+set double advection_dt_factor 1.
 set double lu_relaxed_tolerance 1e-5
+set int num_iterations_limit 5
+set double rhie_chow_factor 0.1
+set vect pressure_fixed_point (0, 0, 0)
+set double pressure_fixed_value 0
+set double guess_extrapolation 1
+set string meshvel_auto vcx
+set bool dt_auto 1
 
 # output
 set string field_output_format paraview

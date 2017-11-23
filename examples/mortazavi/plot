@@ -34,16 +34,23 @@ mp.plot_lines([
         ] , preset='m')
 
 # plot streamlines for best step 
-xr = 0.88  # bubble center on reference
+xr = 0.87  # bubble center on reference
 lx = 1.
-xs = hs['x']
-sel = np.where(xs > xs.max() - 2. * lx)[0]
-n = sel[np.argmin(np.abs((xs[sel]) % lx - xr))]
-mp.plot_stream(ds['x'][n], ds['y'][n], 
-        ds['u'][n], ds['v'][n], ds['f'][n], bg=pr + "s.png")
+n = len(ds['x']) - 1
+x = np.array(ds['x'][n])
+xs = hs['x'][n]
+print(xs, x.min(), xr)
+cond = (x - x.min() < xs - x.min() + lx - xr)
+il = np.where(cond)[0]
+ir = np.where(~cond)[0]
+x[il] += lx
+ii = np.hstack((ir, il))
+assert(len(il) + len(ir) == len(x))
+mp.plot_stream(x[ii], ds['y'][n][ii], 
+        ds['u'][n][ii], ds['v'][n][ii], ds['f'][n][ii], bg=pr + "s.png")
 
 # plot contour
-skip=10
+skip=50
 for n in range(len(ds['x']))[::skip]:
     fo = "contour_{:04d}.png".format(n)
     mp.plot_contour(ds['x'][n], ds['y'][n], 
