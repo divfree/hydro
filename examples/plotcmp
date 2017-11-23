@@ -1,0 +1,36 @@
+#!/usr/bin/env python
+
+import mfer.post as mp
+import numpy as np
+
+pp = [
+        ["Nx64", "hydro,Nx64"],
+        ["Nx64Fix", "hydro,Nx64,fix"],
+        ["Nx128", "hydro,Nx128"],
+        ["Nx128Fix", "hydro,Nx128,fix"],
+        ["Nx256", "hydro,Nx256"],
+        ]
+dd = [mp.get_series(e[0], cache=1) for e in pp]
+hh = [mp.get_history(d) for d in dd]
+ll = [e[1] for e in pp]
+
+pr = "ref/"
+hr1x,hr1y = np.loadtxt(pr + 'xy').T
+hr2x,hr2u = np.loadtxt(pr + 'xu').T
+lbr = "Mortazavi"
+
+# plot lines
+mp.plot_lines(
+        [{'x':h['x']-h['x'][0], 'y':h['y'], 'lb':l} for (h,l) in zip(hh,ll)] + 
+        [{'x':hr1x, 'y':hr1y, 'lb':lbr, 'c':'k'},] 
+        , preset='y')
+
+mp.plot_lines(
+        [{'x':h['x']-h['x'][0], 'y':h['u'], 'lb':l} for (h,l) in zip(hh,ll)] + 
+        [{'x':hr2x, 'y':hr2u, 'lb':lbr, 'c':'k'},]
+        , preset='u')
+
+mp.plot_lines(
+        [{'x':h['x']-h['x'][0], 'y':(h['vol']-h['vol'][0])/h['vol'][0], 'lb':l} 
+            for (h,l) in zip(hh,ll)] 
+        , preset='m')
