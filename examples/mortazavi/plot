@@ -4,7 +4,7 @@ import mfer.post as mp
 import numpy as np
 
 ps = "."
-ds = mp.get_series(ps, cache=0)
+ds = mp.get_series(ps, cache=1)
 hs = mp.get_history(ds)
 lbs = "hydro"
 
@@ -34,20 +34,20 @@ mp.plot_lines([
         ] , preset='m')
 
 # plot streamlines for best step 
-xr = 0.87  # bubble center on reference
+xr = 0.87  # reference center
 lx = 1.
 n = len(ds['x']) - 1
 x = np.array(ds['x'][n])
-xs = hs['x'][n]
-print(xs, x.min(), xr)
-cond = (x - x.min() < xs - x.min() + lx - xr)
-il = np.where(cond)[0]
-ir = np.where(~cond)[0]
-x[il] += lx
-ii = np.hstack((ir, il))
-assert(len(il) + len(ir) == len(x))
-mp.plot_stream(x[ii], ds['y'][n][ii], 
-        ds['u'][n][ii], ds['v'][n][ii], ds['f'][n][ii], bg=pr + "s.png")
+xs = hs['x'][n]  # current center
+# move mesh by k*lx so that xs is bubble center
+x = x - (x.min() - x.min() % lx) + xs - (xs % lx) 
+#cond = (x  + xr - xs < lx) 
+#il = np.where(cond)[0]
+#ir = np.where(~cond)[0]
+#x[ir] -= lx 
+shift = (xr - (xs - x.min()) + lx) % lx
+x = x.min() + (x - x.min() + shift) % lx - shift
+mp.plot_stream(x, ds['y'][n], ds['u'][n], ds['v'][n], ds['f'][n], bg=pr + "s.png")
 
 # plot contour
 skip=50
