@@ -4,3 +4,4 @@ set -e
 
 rm -fv *.png
 rm -fv *.pdf
+rm -fv *.npy
