@@ -2,15 +2,17 @@
 
 dir0 = set(dir()) | {"dir0"}
 
-Red = 10
-alpha = 8
-gamma = 8
+Red = 10.
+alpha = 8.
+gamma = 8.
 We = 0.5
 zeta = 0.125
 
 rhoo = 1.
-Uc = 1
-H = 1
+Uc = 1.
+H = 1.
+x0 = 0.5 * H
+y0 = 0.825 * H
 
 a = zeta * H
 d = 2 * a
@@ -25,3 +27,36 @@ dird = dir1 - dir0
 
 for v in sorted(dird):
     print("{:} \t=\t {:}".format(v, globals()[v]))
+
+T = 40. * H / Uc
+dt = 1e-6 * H / Uc
+
+out='''
+# domain
+set vect A (0, 0)
+set vect B ({H},{H})
+
+# initial drop
+set vect IC ({x0}, {y0})
+set double IR {a}
+
+# initial velocity
+set vect initial_velocity ({Uc}, 0)
+set bool initial_pois 1
+
+# time
+set double T {T}
+set double dt {dt}
+
+# physical parameters
+set vect force ({pgrad}, 0, 0)
+set double density_0 {rhoo}
+set double density_1 {rhoi}
+set double viscosity_0 {muo}
+set double viscosity_1 {mui}
+set double sigma -{sigma}
+
+'''.format(**globals())
+
+with open("par.hydroconf", 'w') as f:
+    f.write(out)

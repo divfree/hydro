@@ -1,0 +1,25 @@
+
+# domain
+set vect A (0, 0)
+set vect B (1.0,1.0)
+
+# initial drop
+set vect IC (0.5, 0.825)
+set double IR 0.125
+
+# initial velocity
+set vect initial_velocity (1.0, 0)
+set bool initial_pois 1
+
+# time
+set double T 40.0
+set double dt 1e-06
+
+# physical parameters
+set vect force (0.2, 0, 0)
+set double density_0 1.0
+set double density_1 8.0
+set double viscosity_0 0.025
+set double viscosity_1 0.2
+set double sigma -0.5
+
