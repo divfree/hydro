@@ -10,6 +10,7 @@
 #include "mesh.hpp"
 
 #define PERX
+#define PERZ
 
 namespace geom {
 
@@ -308,6 +309,12 @@ MeshStructured<Scal>::MeshStructured(const BlockNodes& b_nodes,
       fc_is_inner_[idxcell] = true;
     }
     #endif
+    #ifdef PERZ
+    // adhoc for periodic in z
+    if (midx[2] == mb[2] || midx[2] + 1 == me[2]) {
+      fc_is_inner_[idxcell] = true;
+    }
+    #endif
   }
 
   // Offset for cell neighbour cells
@@ -376,6 +383,17 @@ MeshStructured<Scal>::MeshStructured(const BlockNodes& b_nodes,
             b_cells_.GetIdx(MIdx(mb[0], midx[1], midx[2]));
       }
       #endif
+      #ifdef PERZ
+      // adhoc for periodic in x
+      if (midx[2] == mb[2] && dir == Direction::k) {
+        ff_neighbour_cell_[idxface][0] = 
+            b_cells_.GetIdx(MIdx(midx[0], midx[1], me[2] - 1));
+      }
+      if (midx[2] == me[2] && dir == Direction::k) {
+        ff_neighbour_cell_[idxface][1] = 
+            b_cells_.GetIdx(MIdx(midx[0], midx[1], mb[2]));
+      }
+      #endif
     }
   }
 
@@ -415,6 +433,19 @@ MeshStructured<Scal>::MeshStructured(const BlockNodes& b_nodes,
       if (midx[0] == me[0] && dir == Direction::i) {
         auto pf = b_faces_.GetIdx(MIdx(mb[0], midx[1], midx[2]), dir);
         auto pc = b_cells_.GetIdx(MIdx(mb[0], midx[1], midx[2]));
+        ff_to_cell_[idxface][1] = GetCenter(pc) - GetCenter(pf);
+      }
+      #endif
+      #ifdef PERZ
+      // adhoc for periodic in z
+      if (midx[2] == mb[2] && dir == Direction::k) {
+        auto pf = b_faces_.GetIdx(MIdx(midx[0], midx[1], me[2]), dir);
+        auto pc = b_cells_.GetIdx(MIdx(midx[0], midx[1], me[2] - 1));
+        ff_to_cell_[idxface][0] = GetCenter(pc) - GetCenter(pf);
+      }
+      if (midx[2] == me[2] && dir == Direction::k) {
+        auto pf = b_faces_.GetIdx(MIdx(midx[0], midx[1], mb[2]), dir);
+        auto pc = b_cells_.GetIdx(MIdx(midx[0], midx[1], mb[2]));
         ff_to_cell_[idxface][1] = GetCenter(pc) - GetCenter(pf);
       }
       #endif
