@@ -277,6 +277,7 @@ MeshStructured<Scal>::MeshStructured(const BlockNodes& b_nodes,
     , ff_direction_(b_faces_)
     , ff_neighbour_cell_(b_faces_)
     , ff_neighbour_node_(b_faces_)
+    , ff_to_cell_(b_faces_)
     , fc_is_inner_(b_cells_)
     , ff_is_inner_(b_faces_)
     , fc_is_excluded_(b_cells_, false)
@@ -395,10 +396,15 @@ MeshStructured<Scal>::MeshStructured(const BlockNodes& b_nodes,
   for (Direction dir : {Direction::i, Direction::j, Direction::k}) {
     for (auto midx : BlockCells(mb, me - mb + dir)) {
       IdxFace idxface = b_faces_.GetIdx(midx, dir);
-      ff_to_cell_[idxface][0] = 
-          GetCenter(GetNeighbourCell(idxface, 0)) - GetCenter(idxface);
-      ff_to_cell_[idxface][1] = 
-          GetCenter(GetNeighbourCell(idxface, 1)) - GetCenter(idxface);
+      IdxCell c;
+      c = GetNeighbourCell(idxface, 0);
+      if (!c.IsNone()) {
+        ff_to_cell_[idxface][0] = GetCenter(c) - GetCenter(idxface);
+      }
+      if (!c.IsNone()) {
+        c = GetNeighbourCell(idxface, 1);
+      }
+      ff_to_cell_[idxface][1] = GetCenter(c) - GetCenter(idxface);
       #ifdef PERX
       // adhoc for periodic in x
       if (midx[0] == mb[0] && dir == Direction::i) {
