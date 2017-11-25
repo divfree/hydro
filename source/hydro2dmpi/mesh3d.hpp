@@ -9,6 +9,8 @@
 
 #include "mesh.hpp"
 
+#define PERX
+
 namespace geom {
 
 namespace geom3d {
@@ -47,6 +49,7 @@ class MeshStructured : public MeshGeneric<Scal, 3> {
   FieldFace<Direction> ff_direction_;
   FieldFace<std::array<IdxCell, kFaceNumNeighbourCells>> ff_neighbour_cell_;
   FieldFace<std::array<IdxNode, kFaceNumNeighbourNodes>> ff_neighbour_node_;
+  FieldFace<std::array<Vect, kFaceNumNeighbourCells>> ff_to_cell_;
   FieldCell<bool> fc_is_inner_;
   FieldFace<bool> ff_is_inner_;
   FieldCell<bool> fc_is_excluded_;
@@ -142,6 +145,9 @@ class MeshStructured : public MeshGeneric<Scal, 3> {
   }
   IdxCell GetNeighbourCell(IdxFace idx, size_t n) const override {
     return ff_neighbour_cell_[idx][n];
+  }
+  Vect GetVectToCell(IdxFace idx, size_t n) const {
+    return ff_to_cell_[idx][n];
   }
   IdxNode GetNeighbourNode(IdxFace idx, size_t n) const override {
     return ff_neighbour_node_[idx][n];
@@ -295,6 +301,12 @@ MeshStructured<Scal>::MeshStructured(const BlockNodes& b_nodes,
         nface(0, 0, 1, Direction::k)}};
 
     fc_is_inner_[idxcell] = (mb < midx && midx + MIdx(1) < me);
+    #ifdef PERX
+    // adhoc for periodic in x
+    if (midx[0] == mb[0] || midx[0] + 1 == me[0]) {
+      fc_is_inner_[idxcell] = true;
+    }
+    #endif
   }
 
   // Offset for cell neighbour cells
@@ -352,6 +364,17 @@ MeshStructured<Scal>::MeshStructured(const BlockNodes& b_nodes,
       if (midx[dir] == me[dir]) {
         ff_neighbour_cell_[idxface][1] = IdxCell::None();
       }
+      #ifdef PERX
+      // adhoc for periodic in x
+      if (midx[0] == mb[0] && dir == Direction::i) {
+        ff_neighbour_cell_[idxface][0] = 
+            b_cells_.GetIdx(MIdx(me[0] - 1, midx[1], midx[2]));
+      }
+      if (midx[0] == me[0] && dir == Direction::i) {
+        ff_neighbour_cell_[idxface][1] = 
+            b_cells_.GetIdx(MIdx(mb[0], midx[1], midx[2]));
+      }
+      #endif
     }
   }
 
@@ -368,6 +391,31 @@ MeshStructured<Scal>::MeshStructured(const BlockNodes& b_nodes,
     fc_volume_[idx] = CalcVolume(idx);
   }
 
+  // Vect to cell
+  for (Direction dir : {Direction::i, Direction::j, Direction::k}) {
+    for (auto midx : BlockCells(mb, me - mb + dir)) {
+      IdxFace idxface = b_faces_.GetIdx(midx, dir);
+      ff_to_cell_[idxface][0] = 
+          GetCenter(GetNeighbourCell(idxface, 0)) - GetCenter(idxface);
+      ff_to_cell_[idxface][1] = 
+          GetCenter(GetNeighbourCell(idxface, 1)) - GetCenter(idxface);
+      #ifdef PERX
+      // adhoc for periodic in x
+      if (midx[0] == mb[0] && dir == Direction::i) {
+        auto pf = b_faces_.GetIdx(MIdx(me[0], midx[1], midx[2]), dir);
+        auto pc = b_cells_.GetIdx(MIdx(me[0] - 1, midx[1], midx[2]));
+        ff_to_cell_[idxface][0] = GetCenter(pc) - GetCenter(pf);
+      }
+      if (midx[0] == me[0] && dir == Direction::i) {
+        auto pf = b_faces_.GetIdx(MIdx(mb[0], midx[1], midx[2]), dir);
+        auto pc = b_cells_.GetIdx(MIdx(mb[0], midx[1], midx[2]));
+        ff_to_cell_[idxface][1] = GetCenter(pc) - GetCenter(pf);
+      }
+      #endif
+    }
+  }
+
+  // Mark inner faces
   for (auto idxface : this->Faces()) {
     ff_is_inner_[idxface] = (!GetNeighbourCell(idxface, 0).IsNone() &&
         !GetNeighbourCell(idxface, 1).IsNone());
