@@ -16,6 +16,7 @@ set double T 40.0
 set double dt 1e-06
 
 # physical parameters
+set int num_phases 2
 set vect force (0.2, 0, 0)
 set double density_0 1.0
 set double density_1 8.0

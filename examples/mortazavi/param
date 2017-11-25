@@ -49,6 +49,7 @@ set double T {T}
 set double dt {dt}
 
 # physical parameters
+set int num_phases 2
 set vect force ({pgrad}, 0, 0)
 set double density_0 {rhoo}
 set double density_1 {rhoi}
