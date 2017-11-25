@@ -1,0 +1,80 @@
+#!/usr/bin/env python
+
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+
+import mfer.post as mp
+import numpy as np
+
+ps = "."
+ds = mp.get_series(ps, cache=1)
+hs = mp.get_history(ds)
+lbs = "hydro"
+
+pr = "ref/"
+hr1x,hr1y = np.loadtxt(pr + 'xy').T
+hr2x,hr2u = np.loadtxt(pr + 'xu').T
+lbr = "Mortazavi"
+
+# plot contour
+skip = 1
+
+pr = 0.005
+dt = 0.1  # time step between data files
+pdt = 0.01  # time step to advance particles
+p = mp.part_init([0,1], [0,1], pr, n=0)
+p['t'] = None
+
+n = -1
+x1,y1,psi1 = mp.get_psi(ds['x'][n], ds['y'][n], ds['u'][n], ds['v'][n], ds['f'][n])
+
+for n in range(len(ds['x']))[::skip]:
+    t = n * dt
+    if p['t'] is None:
+        p['t'] = t
+    x = ds['x'][n]
+    x -= x.min()
+    y = ds['y'][n]
+    y -= y.min()
+    vx = ds['u'][n]
+    vy = ds['v'][n]
+    sf = ds['f'][n]
+    vx0 = np.average(vx, weights=sf)
+    vy0 = np.average(vy, weights=sf)
+    vx -= vx0
+    vy -= vy0
+    m = (vx ** 2 + vy ** 2) ** 0.5
+    fo = "part_{:04d}.png".format(n)
+    print("save to {:}".format(fo))
+    fig,ax = plt.subplots()
+    ax.set_aspect('equal')
+
+    sp = ds['p'][n]
+    sp -= np.median(sp)
+    spmax = max(0.001, np.where(sf < 0.01, abs(sp), 0.).max()) * 0.25
+    spmax = 0.1
+    sp = np.clip(sp, -spmax*0.99, spmax*0.99)
+
+    # plot streamlines
+    #mp.plot_ax_stream(ax, x, y, vx, vy, sf) 
+    x1,y1,psi = mp.get_psi(x, y, vx, vy, sf)
+    lvls = np.linspace(psi1.min(), psi1.max(), 28)
+    ax.contour(x1, y1, psi, lvls, colors='k', alpha=0.25,  linestyles="solid", linewidths=1.)
+    # plot pressure 
+    tri = ax.tricontourf(x, y, sp, 64, vmin=-spmax, vmax=spmax, cmap=plt.cm.bwr)
+    cbar = fig.colorbar(tri)
+    cbar.set_clim(-spmax, spmax)
+    # plot interface
+    ax.tricontour(x, y, ds['f'][n], [0.5,0.5001], colors='k', linewidths=1.5)
+
+    xlim = [x.min(), x.max()]
+    ylim = [y.min(), y.max()]
+    mp.part_refill(p, pr, xlim, ylim, nx=64)
+    # plot particles
+    mp.part_plot(ax, p)
+    mp.part_adv(p, x, y, vx, vy, dt=pdt, tend=t + 0.5 * dt)
+
+    #plt.tight_layout()
+    plt.savefig(fo, dpi=300)
+    plt.close()
