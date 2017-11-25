@@ -1,0 +1,27 @@
+#!/usr/bin/env python
+
+dir0 = set(dir()) | {"dir0"}
+
+Red = 10
+alpha = 8
+gamma = 8
+We = 0.5
+zeta = 0.125
+
+rhoo = 1.
+Uc = 1
+H = 1
+
+a = zeta * H
+d = 2 * a
+rhoi = alpha * rhoo
+muo = rhoo * Uc * d / Red
+mui = gamma * muo
+sigma = rhoo * Uc ** 2 * d / We
+pgrad = 8 * Uc * muo / H ** 2
+
+dir1 = set(dir())
+dird = dir1 - dir0
+
+for v in sorted(dird):
+    print("{:} \t=\t {:}".format(v, globals()[v]))
