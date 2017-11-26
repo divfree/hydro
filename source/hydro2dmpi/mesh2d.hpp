@@ -392,10 +392,10 @@ MeshStructured<Scal>::MeshStructured(const BlockNodes& b_nodes,
       if (!c.IsNone()) {
         ff_to_cell_[idxface][0] = GetCenter(c) - GetCenter(idxface);
       }
+      c = GetNeighbourCell(idxface, 1);
       if (!c.IsNone()) {
-        c = GetNeighbourCell(idxface, 1);
+        ff_to_cell_[idxface][1] = GetCenter(c) - GetCenter(idxface);
       }
-      ff_to_cell_[idxface][1] = GetCenter(c) - GetCenter(idxface);
       #ifdef PERX
       // adhoc for periodic in x
       if (midx[0] == mb[0] && dir == Direction::i) {
