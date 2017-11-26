@@ -1,0 +1,75 @@
+#!/usr/bin/env python
+
+import mfer.post as mp
+import numpy as np
+
+ps = "."
+ds = mp.get_series(ps, cache=1)
+hs = mp.get_history(ds)
+lbs = "hydro"
+
+pr = "ref/"
+hr1x,hr1y = np.loadtxt(pr + 'xy').T
+hr2x,hr2u = np.loadtxt(pr + 'xu').T
+lbr = "Mortazavi"
+
+
+
+# plot lines
+xs0 = hs['x'] - hs['x'][0]
+#ts = hs['t']
+mp.plot_lines([
+        {'x':xs0, 'y':hs['y'], 'lb':lbs},
+        {'x':hr1x, 'y':hr1y, 'lb':lbr},
+        ] , preset='y')
+
+mp.plot_lines([
+        {'x':xs0, 'y':hs['u'], 'lb':lbs},
+        {'x':hr2x, 'y':hr2u, 'lb':lbr},
+        ] , preset='u')
+
+vol0 = hs['vol'][0]
+mp.plot_lines([
+        {'x':xs0, 'y':(hs['vol']-vol0)/vol0, 'lb':lbs},
+        ] , preset='m')
+
+# plot streamlines for best step 
+xr = 0.87  # reference center
+lx = 1.
+n = len(ds['x']) - 1
+x = np.array(ds['x'][n])
+xs = hs['x'][n]  # current center
+# move mesh by k*lx so that xs is bubble center
+x = x - (x.min() - x.min() % lx) + xs - (xs % lx) 
+#cond = (x  + xr - xs < lx) 
+#il = np.where(cond)[0]
+#ir = np.where(~cond)[0]
+#x[ir] -= lx 
+shift = (xr - (xs - x.min()) + lx) % lx
+x = x.min() + (x - x.min() + shift) % lx - shift
+mp.plot_stream(x, ds['y'][n], ds['u'][n], ds['v'][n], ds['f'][n], bg=pr + "s.png")
+
+# plot contour
+skip=1
+for n in range(len(ds['x']))[::skip]:
+    fo = "contour_{:04d}.png".format(n)
+    mp.plot_contour(ds['x'][n], ds['y'][n], 
+        np.clip(ds['f'][n], 0., 1.), fo=fo, fill=True)
+
+for n in range(len(ds['x']))[::skip]:
+    fo = "contour_p_{:04d}.png".format(n)
+    mp.plot_contour(ds['x'][n], ds['y'][n], 
+        ds['p'][n], fo=fo, fill=True)
+
+for n in range(len(ds['x']))[::skip]:
+    u = ds['u'][n]
+    v = ds['v'][n]
+    u0 = np.average(u, weights=ds['f'][n])
+    v0 = np.average(v, weights=ds['f'][n])
+    u -= u0
+    v -= v0
+    m = (u ** 2 + v ** 2) ** 0.5
+    fo = "contour_u_{:04d}.png".format(n)
+    mp.plot_contour(ds['x'][n], ds['y'][n], 
+        #np.clip(ds['f'][n], 0., 1.), fo=fo, fill=True)
+        m, fo=fo, fill=True)

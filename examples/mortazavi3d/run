@@ -1,0 +1,12 @@
+#!/bin/sh
+
+./kill
+
+if [[ -f hydro3.lock ]] ; then 
+  echo "Error hydro3.lock exists. No action."
+  exit
+fi
+export OMP_NUM_THREADS=4
+
+nohup nice -n 19 hydro start.hydroconf &
+echo $! > hydro3.pid
