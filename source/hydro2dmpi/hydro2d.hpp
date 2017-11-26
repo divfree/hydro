@@ -1536,7 +1536,8 @@ void hydro<Mesh>::write_results(bool force)
 
   if (force || (!ecast(P_bool("no_mesh_output")) &&
       time >= last_frame_time_ + frame_duration)) {
-    last_frame_time_ = time;
+    //last_frame_time_ = time;
+    last_frame_time_ += frame_duration;
     session->Write(time, P_string[_plt_title] + ":" + IntToStr(P_int["n"]));
     logger() << "Frame " << (P_int["current_frame"]++) << ": t=" << time;
   }
