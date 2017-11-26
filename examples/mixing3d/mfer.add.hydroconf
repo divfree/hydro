@@ -1,0 +1,27 @@
+
+set double T 10
+set int max_frame_index 25
+set vect force (0., 0, 0)
+set vect gravity (0., -0.2, 0)
+
+set int Nx 32
+set int Ny 32
+set int Nz 32
+
+set double guess_extrapolation 1
+del meshvel_auto
+set bool dt_auto 0
+
+set double dt 0.05
+
+set vect initial_velocity (0, 0, 0)
+set bool initial_pois 0
+
+set double sigma 0.1
+
+#set string MODULE hydro2D_uniform_MPI
+#set bool output_z 0
+#set bool output_velocity_z 0
+
+set vect pressure_fixed_point (0, 1, 0)
+set double pressure_fixed_value 0

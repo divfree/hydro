@@ -1,0 +1,14 @@
+#!/bin/sh
+
+#./kill
+#./clean
+#./cleanpic
+
+if [[ -f hydro3.lock ]] ; then 
+  echo "Error hydro3.lock exists. No action."
+  exit
+fi
+export OMP_NUM_THREADS=4
+
+hydro start.hydroconf
+./plot
