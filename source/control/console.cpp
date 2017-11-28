@@ -771,7 +771,7 @@ string TConsole::prompt() {
 }
 
 void TConsole::execute() {
-  while (!flag_exit) {
+  while (!flag_exit && !std::cin.eof()) {
     try {
       cout<<prompt();
       string str_input="";
