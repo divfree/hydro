@@ -494,6 +494,10 @@ class AdvectionSolverMultiExplicit :
       if (std::abs(sharp_) > 1e-10) {
         for (auto idxface : mesh.Faces()) {
           auto n = gf[idxface];
+          const double th = 1.;
+          if (n.norm() < th) {
+            continue;
+          }
           n /= (n.norm() + 1e-6);
           auto nf = n.dot(mesh.GetNormal(idxface));
           auto uf = ff_volume_flux[idxface];
@@ -516,6 +520,12 @@ class AdvectionSolverMultiExplicit :
           IdxFace idxface = mesh.GetNeighbourFace(idxcell, i);
           sh += mesh.GetOutwardFactor(idxcell, i) * ff[idxface];
         }
+        /*
+        const double th = 0.0;
+        if (curr[idxcell] <= th || curr[idxcell] > 1. - th) {
+          sh = 0.;
+        }
+        */
         curr[idxcell] += this->GetTimeStep() * sh / mesh.GetVolume(idxcell);
       }
 
