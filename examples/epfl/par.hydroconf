@@ -1,0 +1,31 @@
+
+# mesh
+set int Nx 128
+set int Ny 64
+
+# domain
+set vect A (0, 0)
+set vect B (2.0,1.0)
+
+# initial drop
+set vect IC (1.0, 0.6)
+set double IR 0.3178
+
+# initial velocity
+set vect initial_velocity (1.0, 0)
+set bool initial_pois 1
+
+# time
+set double T 40.0
+set double dt 1e-06
+
+# physical parameters
+set int num_phases 2
+#set vect force (1.2049289099526068, 0, 0)
+set vect gravity (1.2049289099526068, 0, 0)
+set double density_0 1.0
+set double density_1 0.011999999999999999
+set double viscosity_0 0.15061611374407585
+set double viscosity_1 0.012952985781990523
+set double sigma -1.2712
+

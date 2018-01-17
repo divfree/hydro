@@ -1,0 +1,75 @@
+#!/usr/bin/env python
+
+dir0 = set(dir()) | {"dir0"}
+
+Ny = 64
+
+Red = 4.22
+alpha = 0.0012
+gamma = 0.0086
+alpha *= 10
+gamma *= 10
+We = 0.1458
+We = 0.5
+zeta = 0.3178
+
+rhoo = 1.
+Uc = 1.
+H = 1.
+L = H * 2
+Nx = int(Ny / H * L)
+x0 = 0.5 * L
+y0 = 0.6 * H
+
+a = zeta * H
+d = 2 * a
+rhoi = alpha * rhoo
+muo = rhoo * Uc * d / Red
+mui = gamma * muo
+sigma = rhoo * Uc ** 2 * d / We
+pgrad = 8 * Uc * muo / H ** 2
+
+dir1 = set(dir())
+dird = dir1 - dir0
+
+for v in sorted(dird):
+    print("{:} \t=\t {:}".format(v, globals()[v]))
+
+T = 40. * H / Uc
+dt = 1e-6 * H / Uc
+
+out='''
+# mesh
+set int Nx {Nx}
+set int Ny {Ny}
+
+# domain
+set vect A (0, 0)
+set vect B ({L},{H})
+
+# initial drop
+set vect IC ({x0}, {y0})
+set double IR {a}
+
+# initial velocity
+set vect initial_velocity ({Uc}, 0)
+set bool initial_pois 1
+
+# time
+set double T {T}
+set double dt {dt}
+
+# physical parameters
+set int num_phases 2
+#set vect force ({pgrad}, 0, 0)
+set vect gravity ({pgrad}, 0, 0)
+set double density_0 {rhoo}
+set double density_1 {rhoi}
+set double viscosity_0 {muo}
+set double viscosity_1 {mui}
+set double sigma -{sigma}
+
+'''.format(**globals())
+
+with open("par.hydroconf", 'w') as f:
+    f.write(out)
