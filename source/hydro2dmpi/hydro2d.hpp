@@ -434,6 +434,8 @@ void hydro<Mesh>::InitAdvectionSolver() {
                     GetVect<Vect>(P_vect["B2"]));
   Vect IC(GetVect<Vect>(P_vect["IC"]));
   Scal IR(P_double["IR"]);
+  Vect IC2(GetVect<Vect>(P_vect["IC2"]));
+  Scal IR2(P_double["IR2"]);
   for (auto idx : mesh.Cells()) {
     Vect x = mesh.GetCenter(idx);
     if (block2.IsInside(x)) {
@@ -441,6 +443,8 @@ void hydro<Mesh>::InitAdvectionSolver() {
     } else if (block1.IsInside(x)) {
       v_fc_partial_density_initial[1][idx] = v_fc_true_density[1][idx];
     } else if (x.dist(IC) < IR) {
+      v_fc_partial_density_initial[1][idx] = v_fc_true_density[1][idx];
+    } else if (x.dist(IC2) < IR2) {
       v_fc_partial_density_initial[1][idx] = v_fc_true_density[1][idx];
     }
   }
