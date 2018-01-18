@@ -18,6 +18,12 @@ set vect B2 (0, 0, 1)
 set vect box_A (0, 0)
 set vect box_B (0, 0)
 
+# bubbles
+set vect IC (0., 0., 0.)
+set double IR 0.
+set vect IC2 (0., 0., 0.)
+set double IR2 0.
+
 # mesh
 set int Nx 100
 set int Ny 100
