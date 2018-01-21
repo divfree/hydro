@@ -291,6 +291,20 @@ void hydro<Mesh>::InitFluidSolver() {
     fc_velocity_initial = solver::GetDeformingVelocity(mesh);
   }
 
+  // modulate initial velocity by planar wave
+  if (P_vect.exist("initial_sin_n")) {
+    double ph = P_double["initial_sin_phase"];
+    double lm = P_double["initial_sin_lambda"];
+    Vect n = GetVect<Vect>(P_vect["initial_sin_n"]);
+    double pi = std::atan(1.) * 4.;
+    Vect k = n * (2. * pi / lm);
+    for (auto idx : mesh.Cells()) {
+      Vect x = mesh.GetCenter(idx);
+      auto& v = fc_velocity_initial[idx];
+      v *= std::sin(k.dot(x) - ph);
+    }
+  }
+
   // Boundary conditions for fluid
   for (auto idxface : mesh.Faces()) {
     if (!mesh.IsInner(idxface)) {

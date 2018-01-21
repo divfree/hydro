@@ -37,3 +37,22 @@ for n in range(len(ds['x']))[::skip]:
     plt.savefig(fo, dpi=300)
     plt.close()
 
+# plot contour
+skip=1
+for n in range(len(ds['x']))[::skip]:
+    x = ds['x'][n]
+    y = ds['y'][n]
+    a = ds['v'][n]
+
+    fo = "vel_{:04d}.png".format(n)
+    fig = plt.figure(figsize=(6.4,3.6))
+    fig.patch.set_facecolor('black')
+    ax = plt.Axes(fig, [0., 0., 1., 1.])
+    ax.set_axis_off()
+    fig.add_axes(ax)
+    ax.tricontourf(x, y, a, 128, cmap=plt.cm.hot)
+    #plt.tight_layout()
+    print(fo)
+    plt.savefig(fo, dpi=300)
+    plt.close()
+
