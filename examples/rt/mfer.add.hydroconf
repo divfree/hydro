@@ -36,23 +36,24 @@ set int Nx 160
 set int Ny 90
 set double dt 0.005
 
-set int Nx 80
-set int Ny 45
-set double dt 0.01
+#set int Nx 80
+#set int Ny 45
+#set double dt 0.01
 
-set int num_iterations_limit 3
+#set int num_iterations_limit 3
 
 set vect A1 (0.0, 0.0)
 set vect B1 (1.6, 0.45)
 
-set double T 10
+set double T 20
+set int max_frame_index 200
 
-set double density_0 2.0
+set double density_0 8.0
 set double density_1 1.0
 set double viscosity_0 0.02
-set double viscosity_1 0.01
+set double viscosity_1 0.0025
 
 set vect initial_velocity (0, 0.01, 0)
 set vect initial_sin_n (1, 0, 0)
-set double initial_sin_lambda 0.2
+set double initial_sin_lambda 0.4
 set double initial_sin_phase 0.
