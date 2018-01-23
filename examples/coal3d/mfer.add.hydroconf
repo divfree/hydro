@@ -1,0 +1,13 @@
+set double cfl 0.25
+set double cfl_advection 0.25
+
+#set double sharp 0.3
+
+#set int density_smooth_times 1
+#set int viscosity_smooth_times 1
+
+#set double guess_extrapolation 0
+
+set int num_iterations_limit 10
+set int max_frame_index 200
+

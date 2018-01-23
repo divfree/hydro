@@ -1,0 +1,8 @@
+#!/bin/sh
+
+if [[ -f hydro3.lock ]] ; then 
+  echo "Error hydro3.lock exists. No action."
+  exit
+fi
+
+srun -N 1 -n1 hydro start.hydroconf 
