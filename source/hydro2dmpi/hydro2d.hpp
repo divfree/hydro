@@ -442,6 +442,47 @@ void hydro<Mesh>::InitAdvectionSolver() {
   }
 
   // Initial partial density for phases [1, num_phases)
+  auto& pd1 = v_fc_partial_density_initial[1];
+  auto& td1 = v_fc_true_density[1];
+  // image
+  // read table, assume values between 0 and 1
+  if (P_string.exist("img_init")) {
+    geom::Rect<Vect> b(GetVect<Vect>(P_vect["Aimg"]),
+                      GetVect<Vect>(P_vect["Bimg"]));
+    Vect s = b.GetDimensions();
+    std::string fn = P_string["img_init"];
+    Vect dl = domain.lb, ds=domain.GetDimensions();
+    MIdx ms = mesh.GetBlockCells().GetDimensions();
+    std::ifstream f(fn);
+    int ni, nj;
+    f >> nj >> ni;
+    for (int j = nj - 1; j >= 0; --j) {
+      for (int i = 0; i < ni; ++i) {
+        assert(f.good());
+        Scal u;
+        f >> u;
+        Scal xl = b.lb[0] + s[0] * i / ni;
+        Scal xr = b.lb[0] + s[0] * (i+1) / ni;
+        Scal yl = b.lb[1] + s[1] * j / nj;
+        Scal yr = b.lb[1] + s[1] * (j+1) / nj;
+        int pl = std::max<Scal>((xl - dl[0]) / ds[0] * ms[0], 0);
+        int pr = std::min<Scal>((xr - dl[0]) / ds[0] * ms[0], ms[0]-1);
+        int ql = std::max<Scal>((yl - dl[1]) / ds[1] * ms[1], 0);
+        int qr = std::min<Scal>((yr - dl[1]) / ds[1] * ms[1], ms[1]-1);
+        for (int p = pl; p < pr; ++p) {
+          for (int q = ql; q < qr; ++q) {
+            MIdx m;
+            m[0] = p;
+            m[1] = q;
+            IdxCell idx = mesh.GetBlockCells().GetIdx(m);
+            pd1[idx] = u * td1[idx];
+          }
+        }
+      }
+    }
+  }
+
+  // primitives
   geom::Rect<Vect> block1(GetVect<Vect>(P_vect["A1"]),
                     GetVect<Vect>(P_vect["B1"]));
   geom::Rect<Vect> block2(GetVect<Vect>(P_vect["A2"]),
