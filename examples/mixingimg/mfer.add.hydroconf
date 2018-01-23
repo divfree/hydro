@@ -33,12 +33,14 @@ set double sigma 0.01
 
 set int Nx 256
 set int Ny 256
-set double dt 0.0025
+set double dt 0.005
 set int max_frame_index 200
 set double T 5
 
-set int num_iterations_limit 1
+set int num_iterations_limit 5
 
+set double lu_relaxed_relaxation_factor 1.97
+#set int lu_relaxed_num_iters_limit 1000
 
 # img
 set string img_init img.dat
