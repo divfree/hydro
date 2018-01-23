@@ -1,0 +1,20 @@
+#!/bin/sh
+
+set -eu
+
+if [[ -f "hydro3.lock" ]] ; then
+  #pid=`cat hydro.pid`
+  #if ps -p $pid > /dev/null ; then
+    echo "Error: hydro3 running. No action."
+    exit
+  #fi
+fi
+
+rm -f hydro3.lock
+rm -f hydro3.pid
+rm -f tp1*
+rm -f *.vts
+rm -f *.pvd
+rm -f nohup.out
+rm -f exp.log
+rm -f exp.scalar.dat

@@ -1,0 +1,20 @@
+set vect initial_velocity (0, 0.01, 0)
+set vect initial_sin_n (1, 0, 0)
+set double initial_sin_lambda 1.91234e-5
+set double initial_sin_phase 17e10
+
+set int Nx 256
+set int Ny 256
+
+# img
+set string img_init img.dat
+set vect Aimg (0.1, 0.1)
+set vect Bimg (0.9, 0.9)
+set double IR 0.
+
+set vect A (0, 0, 0)
+set vect B (1.,1.,1.)
+set vect A1 (0., 0.)
+set vect B1 (-1., 0.)
+
+set double viscosity_1 1.

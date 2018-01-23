@@ -1,0 +1,72 @@
+set string plt_title "Mortazavi"
+set string MODULE hydro2D_uniform_MPI
+
+# boundary conditions
+set string condition_top    "wall 0 0 0"
+set string condition_bottom "wall 0 0 0"
+
+# (periodic hard-coded)
+#set string condition_left    "wall 0 0 0"
+#set string condition_right   "wall 0 0 0"
+
+# mesh
+set int Nx 160
+set int Ny 90
+set double dt 0.005
+
+# numerical parameters
+set int initial_volume_fraction_smooth_times 0
+set int density_smooth_times 0
+set int viscosity_smooth_times 0
+set bool simpler 0
+set double sharp 0.
+set double convergence_tolerance 1e-4
+set double advection_dt_factor 1.
+set double lu_relaxed_tolerance 1e-5
+set int num_iterations_limit 20
+set double rhie_chow_factor 1.
+set vect pressure_fixed_point (0, 0, 0)
+set double pressure_fixed_value 0
+set double guess_extrapolation 1
+set string meshvel_auto vcx
+set bool dt_auto 1
+
+set vect force (0., 0, 0)
+set vect gravity (0., -1., 0)
+
+del meshvel_auto
+#set bool dt_auto 0
+
+set double sigma 0.0
+
+set vect pressure_fixed_point (0, 1, 0)
+set double pressure_fixed_value 0
+
+# rect with c1=1
+set vect A (0, 0, 0)
+set vect B (1.6,0.9,1.0)
+set vect A1 (0.0, 0.0)
+set vect B1 (1.6, 0.45)
+
+set double T 20
+
+set int num_phases 2
+set vect force (0., 0, 0)
+set double density_0 2.0
+set double density_1 1.0
+set double viscosity_0 0.002
+set double viscosity_1 0.001
+
+set double cfl 0.25
+set double cfl_advection 0.25
+
+set vect initial_velocity (0, 0.01, 0)
+set vect initial_sin_n (1, 0, 0)
+set double initial_sin_lambda 0.4
+set double initial_sin_phase 1.57079632679 
+
+# output
+set string field_output_format paraview
+set int max_frame_index $(T)0
+set bool output_z 0
+set bool output_velocity_z 0

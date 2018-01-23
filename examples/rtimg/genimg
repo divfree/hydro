@@ -1,0 +1,27 @@
+#!/usr/bin/env python3
+
+import numpy as np
+import os
+import scipy 
+import scipy.ndimage
+
+fni = "trump.jpg"
+u = scipy.ndimage.imread(fni, mode='L')
+
+u = u.astype(np.float)
+u = (u - u.min()) / u.ptp()
+
+s = np.array(u.shape)
+smax = 256
+z = smax / s.max()
+
+u = scipy.ndimage.zoom(u, z)
+
+print("new shape: {:}".format(u.shape))
+
+fno = "img.dat"
+
+with open(fno, 'wb') as fo:
+    fo.write(str.encode("{:} {:}\n".format(*u.shape)))
+    np.savetxt(fo, u)
+
