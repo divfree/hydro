@@ -29,7 +29,7 @@ set int num_iterations_limit 20
 set double rhie_chow_factor 1.
 set vect pressure_fixed_point (0, 0, 0)
 set double pressure_fixed_value 0
-set double guess_extrapolation 1
+set double guess_extrapolation 0
 set string meshvel_auto vcx
 set bool dt_auto 1
 

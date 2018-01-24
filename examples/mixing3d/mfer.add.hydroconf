@@ -8,7 +8,7 @@ set int Nx 32
 set int Ny 32
 set int Nz 32
 
-set double guess_extrapolation 1
+set double guess_extrapolation 0
 del meshvel_auto
 set bool dt_auto 0
 
