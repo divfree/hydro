@@ -147,6 +147,42 @@ class hydro : public TModule
   FieldCell<T> GetVolumeAveraged(const std::vector<FieldCell<T>>& v_fc_field);
   template <class T>
   FieldCell<T> GetSum(const std::vector<FieldCell<T>>& v_fc_field);
+  // Reads matrix from file fn and maps onto box b.
+  // Overwrites relevant cells of fc_u.
+  void ReadField(std::string fn, geom::Rect<Vect> b, FieldCell<Scal>& fc_u) {
+    FieldCell<Scal> r(mesh);
+    Vect s = b.GetDimensions();
+    Vect dl = domain.lb, ds=domain.GetDimensions();
+    MIdx ms = mesh.GetBlockCells().GetDimensions();
+    std::ifstream f(fn);
+    assert(f.good() && "ReadField(): Can't open file");
+    int ni, nj;
+    f >> nj >> ni;
+    for (int j = nj - 1; j >= 0; --j) {
+      for (int i = 0; i < ni; ++i) {
+        assert(f.good() && "ReadField(): Unexpected EOF");
+        Scal u;
+        f >> u;
+        Scal xl = b.lb[0] + s[0] * i / ni;
+        Scal xr = b.lb[0] + s[0] * (i+1) / ni;
+        Scal yl = b.lb[1] + s[1] * j / nj;
+        Scal yr = b.lb[1] + s[1] * (j+1) / nj;
+        int pl = std::max<Scal>((xl - dl[0]) / ds[0] * ms[0], 0);
+        int pr = std::min<Scal>((xr - dl[0]) / ds[0] * ms[0], ms[0]-1);
+        int ql = std::max<Scal>((yl - dl[1]) / ds[1] * ms[1], 0);
+        int qr = std::min<Scal>((yr - dl[1]) / ds[1] * ms[1], ms[1]-1);
+        for (int p = pl; p < pr; ++p) {
+          for (int q = ql; q < qr; ++q) {
+            MIdx m;
+            m[0] = p;
+            m[1] = q;
+            IdxCell idx = mesh.GetBlockCells().GetIdx(m);
+            fc_u[idx] = u;
+          }
+        }
+      }
+    }
+  }
 
  public:
   hydro(TExperiment* _ex);
@@ -449,35 +485,12 @@ void hydro<Mesh>::InitAdvectionSolver() {
   if (P_string.exist("img_init")) {
     geom::Rect<Vect> b(GetVect<Vect>(P_vect["Aimg"]),
                       GetVect<Vect>(P_vect["Bimg"]));
-    Vect s = b.GetDimensions();
     std::string fn = P_string["img_init"];
-    Vect dl = domain.lb, ds=domain.GetDimensions();
-    MIdx ms = mesh.GetBlockCells().GetDimensions();
-    std::ifstream f(fn);
-    int ni, nj;
-    f >> nj >> ni;
-    for (int j = nj - 1; j >= 0; --j) {
-      for (int i = 0; i < ni; ++i) {
-        assert(f.good());
-        Scal u;
-        f >> u;
-        Scal xl = b.lb[0] + s[0] * i / ni;
-        Scal xr = b.lb[0] + s[0] * (i+1) / ni;
-        Scal yl = b.lb[1] + s[1] * j / nj;
-        Scal yr = b.lb[1] + s[1] * (j+1) / nj;
-        int pl = std::max<Scal>((xl - dl[0]) / ds[0] * ms[0], 0);
-        int pr = std::min<Scal>((xr - dl[0]) / ds[0] * ms[0], ms[0]-1);
-        int ql = std::max<Scal>((yl - dl[1]) / ds[1] * ms[1], 0);
-        int qr = std::min<Scal>((yr - dl[1]) / ds[1] * ms[1], ms[1]-1);
-        for (int p = pl; p < pr; ++p) {
-          for (int q = ql; q < qr; ++q) {
-            MIdx m;
-            m[0] = p;
-            m[1] = q;
-            IdxCell idx = mesh.GetBlockCells().GetIdx(m);
-            pd1[idx] = u * td1[idx];
-          }
-        }
+    FieldCell<Scal> tmp(mesh, 0.);
+    ReadField(fn, b, tmp);
+    for (auto idx : mesh.Cells()) {
+      if (b.IsInside(mesh.GetCenter(idx))) {
+        pd1[idx] = tmp[idx] * td1[idx];
       }
     }
   }
