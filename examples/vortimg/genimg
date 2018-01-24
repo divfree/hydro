@@ -1,0 +1,124 @@
+#!/usr/bin/env python3
+
+import numpy as np
+import os
+import scipy 
+import scipy.ndimage
+import scipy.sparse as sp
+
+def report(nm, u):
+    print("{:}: med {:}, min {:}, max {:}, avg {:}, ptp {:}, std {:}".format(
+            nm, np.median(u), u.min(), u.max(), u.mean(), u.ptp(), u.std()))
+
+def getvel(vort):
+    f = -vort
+
+    i = np.arange(len(f.flatten())).reshape(f.shape)
+    ones = np.ones_like(i).astype(float)
+
+    # inner: laplacian
+    dc = -4. * ones.copy()
+    dxp = ones.copy()
+    dxm = ones.copy()
+    dyp = ones.copy()
+    dym = ones.copy()
+
+    ic = i
+    ixp = np.roll(i, -1, axis=1)
+    ixm = np.roll(i, 1, axis=1)
+    iyp = np.roll(i, -1, axis=0)
+    iym = np.roll(i, 1, axis=0)
+
+    # boundary conditions: derivatives
+    # laplacian = (xp - c) - (c - xm) + (yp - c) - (c - ym)
+    # subtract gradients at the sides
+    # (assume periodic in x)
+    #dxp[:,-1] -= 1. ; dc[:,-1] += 1.
+    #dxm[:, 0] -= 1. ; dc[:, 0] += 1.
+    #dyp[-1,:] -= 1. ; dc[-1,:] += 1.
+    #dym[ 0,:] -= 1. ; dc[ 0,:] += 1.
+
+    # add given values
+    # (assume periodic in x)
+    #f[:,-1] += (v[:,-1] + v[:,-2]) * 0.5
+    #f[:, 0] -= (v[:, 0] + v[:, 1]) * 0.5
+    ## (assume zero at bottom/top walls)
+    # (assume periodic in y)
+    #f[-1,:] += -(u[-1,:] + u[-2,:]) * 0.5
+    #f[ 0,:] -= -(u[ 0,:] + u[ 1,:]) * 0.5
+
+    # combine
+    ld = (dc, dxp, dxm, dyp, dym)
+    data = np.stack(ld, axis=-1)
+    li = (ic, ixp, ixm, iyp, iym)
+    indices = np.stack(li, axis=-1)
+    rowsize = len(li) * np.ones_like(ic)
+
+    # flatten
+    data = data.flatten()
+    indices = indices.flatten()
+    rowsize = rowsize.flatten()
+    indptr = np.concatenate(([0], np.cumsum(rowsize)))
+
+    # fix s[0] = 0
+    #data[0] += 1.
+
+    # solve ax=b
+    a = sp.csr_matrix((data, indices, indptr))
+    b = f.flatten()
+    s = sp.linalg.spsolve(a, b)
+    s = s.reshape(f.shape)
+
+    # compute u,v
+    su = 0.5 * (np.roll(s, -1, axis=0) - np.roll(s, 1, axis=0))
+    su[0,:] = (s[1,:] - s[0,:])
+    su[-1,:] = (s[-1,:] - s[-2,:])
+    sv = -0.5 * (np.roll(s, -1, axis=1) - np.roll(s, 1, axis=1))
+    return su,sv
+
+# read image
+fni = "trump.jpg"
+u = scipy.ndimage.imread(fni, mode='L')
+u = u.astype(np.float)
+u = (u - u.min()) / u.ptp()
+s = np.array(u.shape)
+smax = 256
+z = smax / s.max()
+u = scipy.ndimage.zoom(u, z)
+
+# compute vel
+vort = u + 0.
+av = vort.mean()
+vort **= 3
+vort *= av / vort.mean()
+vort *= 0.005
+vort = np.flipud(vort)
+# different sign for left/right
+vort *= np.linspace(-1.,1.,vort.shape[1])[np.newaxis,:]
+vort -= vort.mean()
+vx,vy = getvel(vort)
+vx = np.flipud(vx)
+vy = np.flipud(vy)
+report("vx", vx)
+report("vy", vy)
+
+# compute vf
+vf = u
+
+print("new shape: {:}".format(u.shape))
+
+fno = "img.dat"
+with open(fno, 'wb') as fo:
+    fo.write(str.encode("{:} {:}\n".format(*u.shape)))
+    np.savetxt(fo, vf)
+
+fno = "imgu.dat"
+with open(fno, 'wb') as fo:
+    fo.write(str.encode("{:} {:}\n".format(*u.shape)))
+    np.savetxt(fo, vx)
+
+fno = "imgv.dat"
+with open(fno, 'wb') as fo:
+    fo.write(str.encode("{:} {:}\n".format(*u.shape)))
+    np.savetxt(fo, vy)
+

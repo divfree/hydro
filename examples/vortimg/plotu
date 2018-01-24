@@ -1,0 +1,69 @@
+#!/usr/bin/env python
+
+import mfer.post as mp
+import numpy as np
+import matplotlib.pyplot as plt
+import os
+
+ps = "."
+ds = mp.get_series(ps, cache=0)
+lbs = "hydro"
+
+# plot velocity
+skip = 10
+for n in range(len(ds['x']))[::skip]:
+    x = ds['x'][n]
+    y = ds['y'][n]
+    a = ds['u'][n]
+
+    fo = "vx_{:04d}.png".format(n)
+    fig = plt.figure(figsize=(5.0,5.0))
+    fig.patch.set_facecolor('black')
+    ax = plt.Axes(fig, [0., 0., 1., 1.])
+    ax.set_axis_off()
+    fig.add_axes(ax)
+    ax.tricontourf(x, y, a, 128, cmap=plt.cm.bwr)
+    #plt.tight_layout()
+    print(fo)
+    plt.savefig(fo, dpi=300)
+    plt.close()
+
+# plot velocity
+for n in range(len(ds['x']))[::skip]:
+    x = ds['x'][n]
+    y = ds['y'][n]
+    a = ds['v'][n]
+
+    fo = "vy_{:04d}.png".format(n)
+    fig = plt.figure(figsize=(5.0,5.0))
+    fig.patch.set_facecolor('black')
+    ax = plt.Axes(fig, [0., 0., 1., 1.])
+    ax.set_axis_off()
+    fig.add_axes(ax)
+    ax.tricontourf(x, y, a, 128, cmap=plt.cm.bwr)
+    #plt.tight_layout()
+    print(fo)
+    plt.savefig(fo, dpi=300)
+    plt.close()
+
+# plot vort
+for n in range(len(ds['x']))[::skip]:
+    x = ds['x'][n]
+    y = ds['y'][n]
+    a = ds['v'][n]
+
+    x1,y1,om = mp.get_vort(ds['x'][n], ds['y'][n], ds['u'][n], ds['v'][n], ds['f'][n])
+
+    fo = "om_{:04d}.png".format(n)
+    fig = plt.figure(figsize=(5.0,5.0))
+    fig.patch.set_facecolor('black')
+    ax = plt.Axes(fig, [0., 0., 1., 1.])
+    ax.set_axis_off()
+    fig.add_axes(ax)
+    ommax = abs(om).max()
+    ommin = -ommax
+    tri = ax.contourf(x1, y1, om, 64, vmin=ommin, vmax=ommax,  cmap=plt.cm.coolwarm)
+    print(fo)
+    plt.savefig(fo, dpi=300)
+    plt.close()
+
