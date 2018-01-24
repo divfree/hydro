@@ -63,6 +63,7 @@ set double cfl_advection 0.25
 #set double lu_relaxed_tolerance 1e-5
 #set int num_iterations_limit 5
 #set int lu_relaxed_num_iters_limit 100
+set double guess_extrapolation 0
 
 set vect AA (0.1, 0.1)
 set vect BB (0.9, 0.9)
