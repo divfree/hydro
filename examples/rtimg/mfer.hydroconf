@@ -60,11 +60,6 @@ set double viscosity_1 0.001
 set double cfl 0.25
 set double cfl_advection 0.25
 
-set vect initial_velocity (0, 0.01, 0)
-set vect initial_sin_n (1, 0, 0)
-set double initial_sin_lambda 0.4
-set double initial_sin_phase 1.57079632679 
-
 # output
 set string field_output_format paraview
 set int max_frame_index $(T)0
