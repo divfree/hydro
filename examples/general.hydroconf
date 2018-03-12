@@ -131,6 +131,7 @@ set vect meshvel (0,0,0)
 #set string meshvel_auto vcx
 set bool meshvel_output 1
 set double meshvel_weight 0.5
+set double sharp 0.
 
 # particles
 set double spawning_gap 0.25
