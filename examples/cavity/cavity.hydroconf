@@ -1,19 +1,22 @@
-set int Nx 64
-set int Ny 64
-set double T 1e5
-set double dt 1e5
+set int Nx 32
+set int Ny 32 
+set double T 1.
+set double dt 0.01
 # Re=3200
 set double viscosity_0 0.0003125
 set string condition_top "wall 1 0 0"
-set int max_frame_index 0
+set int max_frame_index 10
 
-set int num_iterations_limit 1000
+set double velocity_relaxation_factor 0.8
+set double pressure_relaxation_factor 0.9
+
+set int num_iterations_limit 1
 set double convergence_tolerance 1e-6
 
-set int lu_relaxed_num_iters_limit 100
+set int lu_relaxed_num_iters_limit 1000
 set double lu_relaxed_tolerance 0
 
-set bool iter_history_enable 1
+set bool iter_history_enable 0
 set int iter_history_n 0
 
 set string plt_title "Cavity_Nx$(Nx)"
