@@ -1,5 +1,5 @@
-set int Nx 128
-set int Ny 128
+set int Nx 64
+set int Ny 64
 set double T 1e5
 set double dt 1e5
 # Re=3200
@@ -7,7 +7,7 @@ set double viscosity_0 0.0003125
 set string condition_top "wall 1 0 0"
 set int max_frame_index 0
 
-set int num_iterations_limit 100
+set int num_iterations_limit 1000
 set double convergence_tolerance 1e-6
 
 set int lu_relaxed_num_iters_limit 100
