@@ -1,0 +1,16 @@
+*.log
+*.status
+alpha
+pressure
+*.h5
+*.xmf
+*.vts
+*.pvd
+stat.dat
+*.npy
+*.pid
+*.out
+exp.scalar.dat
+contour*.png
+out*.pdf
+stream.pdf

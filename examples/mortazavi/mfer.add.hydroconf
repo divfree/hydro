@@ -1,3 +1,6 @@
 set int Nx 64
 set int Ny $(Nx)
 
+set double T 40
+set int max_frame_index 50
+
